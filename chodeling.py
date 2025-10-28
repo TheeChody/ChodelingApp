@@ -1260,30 +1260,29 @@ async def display_stats_fish():
             if sortby == 0:
                 for key, value in dict_.items():
                     len_key = len(key)
-                    len_value = len(f"{numberize(value[1])}{f'' if -1 <= value[1] <= 1 else f' ({numberize(value[1] / value[0])})'}")
+                    len_value = len(f"{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})")
                     left_length = len_key if len_key > left_length else left_length
                     right_length = len_value if len_value > right_length else right_length
             else:
                 for value in dict_.values():
-                    len_value = len(numberize(value[sortby - 1])) if sortby <= 2 else len(f'{numberize(value[1])} {numberize(value[1] / value[0])}')
-                    len_value_right = len(f"{numberize(value[1])}{f'' if -1 <= value[1] <= 1 else f' Worth ({numberize(value[1] / value[0])})'}") if sortby <= 2 else len(f"{numberize(value[0])} Times ")
+                    len_value = len(numberize(value[0])) if sortby == 1 else len(f' {numberize(value[1])} {numberize(value[1] / value[0])} ')
+                    len_value_right = len(f"Worth {numberize(value[1])} ({f'{numberize(value[1])})' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})") if sortby <= 2 else len(f"{numberize(value[0])} Times ")
                     left_length = len_value if len_value > left_length else left_length
                     right_length = len_value_right if len_value_right > right_length else right_length
             for key, value in dict(sorted(dict_.items(), key=lambda x: x[1 if sortby >= 1 else 0][0 if sortby == 0 else sortby - 1] if sortby <= 2 else x[1][1] / x[1][0])).items():
                 if sortby == 0:
-                    print(space(f"{numberize(value[1])}{f'' if -1 <= value[1] <= 1 else f' ({numberize(value[1] / value[0])})'}", right_length, False, space(key, left_length, middle_txt=f'{type_.title()} {value[0]} Times Worth ')))
+                    print(space(f"Worth {numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", right_length, False, space(key, left_length, middle_txt=f'{type_.title()} {value[0]} Times')))
                 elif sortby == 1:
-                    print(space(f" Worth {numberize(value[1])}{f'' if -1 <= value[1] <= 1 else f' ({numberize(value[1] / value[0])})'}", right_length, False, space(numberize(value[0]), left_length, middle_txt=key)))
+                    print(space(f"Worth {numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", right_length, False, space(numberize(value[0]), left_length, middle_txt=key)))
                 elif sortby == 2:
-                    print(space(f'{numberize(value[0])} Times ', right_length, False, space(f"{numberize(value[1])}{f'' if -1 <= value[1] <= 1 else f' ({numberize(value[1] / value[0])})'}", left_length, middle_txt=key)))
+                    print(space(f'{numberize(value[0])} Times ', right_length, False, space(f"{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", left_length, middle_txt=key)))
                 else:
-                    print(space(f'{numberize(value[0])} Times ', right_length, False, space(f"{numberize(value[1])}{f'' if -1 <= value[1] <= 1 else f' ({numberize(value[1] / value[0])})'}", left_length, middle_txt=key)))
+                    print(space(f'{numberize(value[0])} Times ', right_length, False, space(f"{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", left_length, middle_txt=key)))
 
     async def cutline_stats():
         async def detailed_stats(key_cut: str):
             async def print_details(name: str):
                 cls()
-                # sortby = await fetch_setting("sortby")
                 print(await top_bar(f"{name} has {f'made you loose;' if key_cut == 'cut_by' else f'lost;'}"))
                 await sort_print_list(user_document['data_games']['fish']['totals']['line'][key_cut][name], "cut")
                 input(f"{long_dashes}\nEnter To Return")
@@ -1573,7 +1572,8 @@ async def display_stats_fish():
 
     def space(item: str, line_length: int, left: bool = True, left_item: str = "", middle_txt: str = ""):
         if left:
-            return f"{item}{' ' * (line_length + 2 - len(item))} | {middle_txt}"
+            # return f"{item}{' ' * (line_length + 2 - len(item))} | {middle_txt}"
+            return f"{item}{' ' * (line_length - len(item))} | {middle_txt}"
         else:
             # return f"{' ' * (len(long_dashes) - (line_length + 2 - len(item) - len(item)))}{item}"
             return f"{left_item}{' ' * (len(long_dashes) - (len(left_item) + len(str(item))))}{item}"
