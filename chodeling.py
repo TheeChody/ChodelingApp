@@ -2020,7 +2020,10 @@ async def special_command(key_stroke: str):
             else:
                 status = await send_chat_msg(f"!heist {await fetch_setting('heist')}")
         elif key_stroke == bot.special_commands['joints_count_update']:
-            status = await send_chat_msg(f"!jointscount update 1")
+            if await bot.check_permissions(user.id, "mod"):
+                status = await send_chat_msg(f"!jointscount update 1")
+            else:
+                reason = f"You can't do that!"
         # ToDo; Figure this shit out
         # elif key_stroke == bot.special_commands['quit']:
         #     pass
