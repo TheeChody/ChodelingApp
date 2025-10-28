@@ -566,7 +566,7 @@ def colour(colour_: str, str_: str) -> str:
 
 def connect_mongo(db, alias):
     try:
-        client = connect(db=db, host=bot.login_details['db_string'], alias=alias)
+        client = connect(db=db, host=db_string, alias=alias)
         logger.info(f"{fortime()}: MongoDB Connected\n{long_dashes}")
         time.sleep(1)
         client.get_default_database(db)
