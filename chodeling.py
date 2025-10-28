@@ -1992,10 +1992,12 @@ async def special_command(key_stroke: str):
         if key_stroke == bot.special_commands['bet']:
             now_time = datetime.datetime.now()
             user_document = await refresh_document_user()
-            if await get_long_sec(fortime_long(now_time)) - await get_long_sec(fortime_long(user_document['data_games']['gamble']['last'])) < 600:
+            if user_document['data_games']['gamble']['last'] is None:
+                pass
+            elif await get_long_sec(fortime_long(now_time)) - await get_long_sec(fortime_long(user_document['data_games']['gamble']['last'])) < 600:
                 wait_time = 600 - (await get_long_sec(fortime_long(now_time)) - await get_long_sec(fortime_long(user_document['data_games']['gamble']['last'])))
                 reason = f"Gotta Wait {str(datetime.timedelta(seconds=wait_time)).title()}"
-            else:
+            if reason == "":
                 status = await send_chat_msg("!bet")
         elif key_stroke == bot.special_commands['bbet']:
             status = await send_chat_msg("!bet doubleb")
@@ -2014,10 +2016,12 @@ async def special_command(key_stroke: str):
         elif key_stroke == bot.special_commands['heist']:
             now_time = datetime.datetime.now()
             user_document = await refresh_document_user()
-            if await get_long_sec(fortime_long(now_time)) - await get_long_sec(fortime_long(user_document['data_games']['heist']['gamble']['last'])) < 21600:
+            if user_document['data_games']['heist']['gamble']['last'] is None:
+                pass
+            elif await get_long_sec(fortime_long(now_time)) - await get_long_sec(fortime_long(user_document['data_games']['heist']['gamble']['last'])) < 21600:
                 wait_time = 21600 - (await get_long_sec(fortime_long(now_time)) - await get_long_sec(fortime_long(user_document['data_games']['heist']['gamble']['last'])))
                 reason = f"Gotta Wait {str(datetime.timedelta(seconds=wait_time)).title()}"
-            else:
+            if reason == "":
                 status = await send_chat_msg(f"!heist {await fetch_setting('heist')}")
         elif key_stroke == bot.special_commands['joints_count_update']:
             if await bot.check_permissions(user.id, "mod"):
