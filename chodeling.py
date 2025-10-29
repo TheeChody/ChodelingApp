@@ -2070,7 +2070,9 @@ async def top_bar(left_side: str) -> str:
     try:
         user_document = await refresh_document_user()
         channel_document = await refresh_document_channel()
-        level_check = user_document['data_user']['rank']['level'] + 1
+        level_check = user_document['data_user']['rank']['level']
+        if level_check > 1:
+            level_check += 1
         xp_perc = int(user_document['data_user']['rank']['xp'] / ((150 * float((level_check / 2) * level_check)) * level_check) * 100)
         xp_boost = math.ceil(user_document['data_user']['rank']['boost'] / ((150 * float((level_check / 2) * level_check)) * level_check) * 100)
         dashes = f"{colour('purple', '-' * (xp_perc - xp_boost))}{colour('blue', '-' * xp_boost)}{'-' * (len(long_dashes) - xp_perc)}"
