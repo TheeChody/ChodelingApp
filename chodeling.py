@@ -296,8 +296,8 @@ async def app_settings():
             options = []
             print(await top_bar(f"Default {setting_key.replace('_', ' ').title()} Setting"))
             try:
-                for n, var in enumerate(bot.settings[setting_key]):
-                    options.append(f"{n + 1}. {var.replace('_', ' ').title()}")
+                for n, var in enumerate(bot.settings[setting_key], start=1):
+                    options.append(f"{n}. {var.replace('_', ' ').title()}")
             except Exception as error_printing_display_variables:
                 await bot.error_msg("app_settings", "Error Printing Settings Options", error_printing_display_variables)
             user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
@@ -430,8 +430,8 @@ async def chodeling_commands():
             options = []
             print(await top_bar(f"{command_key.title()} Commands"))
             try:
-                for n, cmd in enumerate(sorted(bot.commands_available[command_key], key=lambda x: x)):
-                    options.append(f"{n+1}. {cmd}")
+                for n, cmd in enumerate(sorted(bot.commands_available[command_key], key=lambda x: x), start=1):
+                    options.append(f"{n}. {cmd}")
             except Exception as error_printing_command:
                 await bot.error_msg("chodeling_commands", f"show_command '{command_key}'", error_printing_command)
             user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
@@ -463,8 +463,8 @@ async def chodeling_commands():
         options = []
         print(await top_bar("Commands Area"))
         try:
-            for n, key in enumerate(sorted(bot.commands_available.keys(), key=lambda x: x)):
-                options.append(f"{n+1}. {key}")
+            for n, key in enumerate(sorted(bot.commands_available.keys(), key=lambda x: x), start=1):
+                options.append(f"{n}. {key}")
         except Exception as error_fetching_commands:
             await bot.error_msg("chodeling_commands", "Fetching Specific Commands", error_fetching_commands)
         user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
@@ -634,7 +634,7 @@ async def display_stats_bingo():
                   f"{long_dashes}")
             dashes = '-' * ((5 * len(chodeling_board)) + (len(chodeling_board) + 1))
             print(dashes)
-            for n, (row, items) in enumerate(chodeling_board.items()):
+            for row, items in chodeling_board.items():
                 print(f"{print_row(items)}\n{dashes}")
         except Exception as error_printing_board:
             await bot.error_msg("display_stats_bingo", "Printing Board", error_printing_board)
@@ -688,18 +688,15 @@ async def display_stats_bingo():
     while True:
         cls()
         options = []
-        game_options = False
         user_document = await refresh_document_user()
         channel_document = await refresh_document_channel()
         print(await top_bar("Bingo Options"))
-        if None not in (user_document['data_games']['bingo']['current_game']['game_type'], channel_document['data_games']['bingo']['current_game']['game_type']):
-            game_options = True
         try:
-            if game_options:
+            if None not in (user_document['data_games']['bingo']['current_game']['game_type'], channel_document['data_games']['bingo']['current_game']['game_type']):
                 options = ["Enter 1 To View Game Info", "Enter 2 To View Your Board"]
-            options.append("Enter 3 To View History")
         except Exception as error_building_options:
             await bot.error_msg("display_stats_bingo", "Error Building Options", error_building_options)
+        options.append("Enter 3 To View History")
         user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
                            "Enter 0 To Go Back\n")
         if user_input.isdigit():
@@ -776,11 +773,8 @@ async def display_stats_bingo():
             elif user_input == 2:
                 async def call_action(action_to_call: str):
                     status = await send_chat_msg(f"!bingo action {action_to_call.title()}")
-                    if status:
-                        print(f"Called {action_to_call.title()}")
-                    else:
-                        print(f"Failed To Call {action_to_call.title()}")
-                    await asyncio.sleep(3)
+                    print(f"Call '{action_to_call.title()}' {'Succeeded' if status else 'Failed'}")
+                    await asyncio.sleep(2)
 
                 while True:
                     cls()
@@ -825,12 +819,15 @@ async def display_stats_bingo():
                     if len(user_stats) > 0:
                         try:
                             points_won = user_stats['total_points_won']
+                            total_games = user_stats['total_games']
+                            total_major_bingo = user_stats['total_major_bingo']
+                            total_minor_bingo = user_stats['total_minor_bingo']
                             print(f"Total Games: {numberize(user_stats['total_games'])}\n"
-                                  f"Total Major Bingo's: {numberize(user_stats['total_major_bingo'])}{f' ({numberize(points_won)})' if user_stats['total_major_bingo'] > 0 else ''}\n"
-                                  f"Total Minor Bingo's: {numberize(user_stats['total_minor_bingo'])}")
+                                  f"Total Major Bingo's: {numberize(user_stats['total_major_bingo'])}{'' if total_major_bingo == 0 else f' | {total_major_bingo / total_games * 100:.2f}%'}{'' if user_stats['total_major_bingo'] == 0 else f' ({numberize(points_won)})'}\n"
+                                  f"Total Minor Bingo's: {numberize(user_stats['total_minor_bingo'])}{'' if total_minor_bingo == 0 else f' | {total_minor_bingo / total_games * 100:.2f}%'}{'' if total_minor_bingo == 0 else f' ({numberize(total_minor_bingo * 10000)})'}")
                             if len(user_stats['game_types']) > 0:
                                 for game_type in list(sorted(user_stats['game_types'].keys(), key=lambda x: x)):
-                                    print(f"{game_type.replace('_', ' ').title()} Games Played: {numberize(user_stats['game_types'][game_type])}")
+                                    print(f"{game_type.replace('_', ' ').title()} Games Played: {numberize(user_stats['game_types'][game_type])} | {user_stats['game_types'][game_type] / total_games * 100:.2f}%")
                         except Exception as error_printing_user_stats:
                             await bot.error_msg("display_stats_bingo", "Error Printing user_stats", error_printing_user_stats)
                     user_input = input(f"{long_dashes}\n"
@@ -929,8 +926,8 @@ async def display_stats_bingo():
                                         user_document = await refresh_document_user()
                                         print(await top_bar(f"{key_date} Games"))
                                         try:
-                                            for n, key_time in enumerate(user_document['data_games']['bingo']['history'][key_date].keys()):
-                                                options.append(f"{n + 1}. {key_time}")
+                                            for n, key_time in enumerate(user_document['data_games']['bingo']['history'][key_date].keys(), start=1):
+                                                options.append(f"{n}. {key_time}")
                                         except Exception as error_building_bingo_date:
                                             await bot.error_msg("display_stats_bingo", f"Error Building Times For {key_date}", error_building_bingo_date)
                                         if len(options) > 0:
@@ -966,8 +963,8 @@ async def display_stats_bingo():
                                         input("You don't have any bingo history yet!!\nHit Enter To Go Back")
                                         await bot.go_back()
                                         break
-                                    for n, date in enumerate(user_document['data_games']['bingo']['history'].keys()):
-                                        options.append(f"{n + 1}. {date}")
+                                    for n, date in enumerate(user_document['data_games']['bingo']['history'].keys(), start=1):
+                                        options.append(f"{n}. {date}")
                                 except Exception as error_building_bingo_games:
                                     await bot.error_msg("display_stats_bingo", "Error Building Bingo Games", error_building_bingo_games)
                                 if len(options) > 0:
@@ -1299,8 +1296,8 @@ async def display_stats_fish():
                 print(await top_bar("Others Who Have Cut Your Line;" if key_cut == "cut_by" else f"Chodelings Who's Lines You've Cut;"))
                 options = []
                 try:
-                    for n, name in enumerate(sorted(user_document['data_games']['fish']['totals']['line'][key_cut].keys(), key=lambda x: x)):
-                        options.append(f"{n + 1}. {name}")
+                    for n, name in enumerate(sorted(user_document['data_games']['fish']['totals']['line'][key_cut].keys(), key=lambda x: x), start=1):
+                        options.append(f"{n}. {name}")
                 except Exception as error_printing_cutline_options:
                     await bot.error_msg("display_stats_fish", "Error Displaying Cutline Detailed Stats", error_printing_cutline_options)
                 user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
@@ -1743,6 +1740,30 @@ async def log_shutdown(logger_list: list):
             pass
 
 
+async def on_message(msg: ChatMessage):
+    try:
+        if msg.text.startswith(("$", "!", "¡")):
+            return
+        msg.text = msg.text.lower()
+        if msg.user.id != bot.login_details['target_id']:
+            if f"@{user.display_name.lower()}" in msg.text:
+                await flash_window("attn")
+        else:
+            if msg.text.startswith(user.display_name.lower()) and "autocast expired" in msg.text:
+                await flash_window("auto_cast_expired")
+    except Exception as error_on_message:
+        await bot.error_msg("on_message", "Generic Error", error_on_message)
+        return
+
+
+async def on_ready(event: EventData):
+    try:
+        await event.chat.join_room(bot.login_details['target_name'])
+        logger.info(f"{fortime()}: Connected to {bot.login_details['target_name']} channel\n{long_dashes}")
+    except Exception as e:
+        await bot.error_msg("on_ready", f"Failed to connect to {bot.login_details['target_name']} channel", e)
+
+
 def numberize(n: float, decimals: int = 2) -> str:
     """
     :param n: number to be numberized
@@ -2006,7 +2027,7 @@ async def special_command(key_stroke: str):
             channel_document = await refresh_document_channel()
             cast_difference = channel_document['data_games']['fish']['upgrades']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit'] - user_document['data_games']['fish']['auto']['cast']
             if cast_difference > 0:
-                status = await send_chat_msg(f"!fish {cast_difference}")
+                status = await send_chat_msg(f"!fish {cast_difference if user.id != bot.special_users['Free2Escape'] else '6969'}")
             else:
                 reason = "Already At Maximum Auto Casts!!"
         elif key_stroke == bot.special_commands['fish_beet']:
@@ -2060,30 +2081,6 @@ async def top_bar(left_side: str) -> str:
     except Exception as error_creating_top_bar:
         await bot.error_msg("top_bar", "Generic Error", error_creating_top_bar)
         return left_side
-
-
-async def on_message(msg: ChatMessage):
-    try:
-        if msg.text.startswith(("$", "!", "¡")):
-            return
-        msg.text = msg.text.lower()
-        if msg.user.id != bot.login_details['target_id']:
-            if f"@{user.display_name.lower()}" in msg.text:
-                await flash_window("attn")
-        else:
-            if msg.text.startswith(user.display_name.lower()) and "autocast expired" in msg.text:
-                await flash_window("auto_cast_expired")
-    except Exception as error_on_message:
-        await bot.error_msg("on_message", "Generic Error", error_on_message)
-        return
-
-
-async def on_ready(event: EventData):
-    try:
-        await event.chat.join_room(bot.login_details['target_name'])
-        logger.info(f"{fortime()}: Connected to {bot.login_details['target_name']} channel\n{long_dashes}")
-    except Exception as e:
-        await bot.error_msg("on_ready", f"Failed to connect to {bot.login_details['target_name']} channel", e)
 
 
 async def run():
