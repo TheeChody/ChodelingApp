@@ -2031,7 +2031,7 @@ async def special_command(key_stroke: str):
             channel_document = await refresh_document_channel()
             cast_difference = channel_document['data_games']['fish']['upgrades']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit'] - user_document['data_games']['fish']['auto']['cast']
             if cast_difference > 0:
-                status = await send_chat_msg(f"!fish {cast_difference if user.id != bot.special_users['Free2Escape'] else '6969'}")
+                status = await send_chat_msg(f"!fish {cast_difference if user.id != bot.special_users['bingo']['Free2Escape'] else '6969'}")
             else:
                 reason = "Already At Maximum Auto Casts!!"
         elif key_stroke == bot.special_commands['fish_beet']:
