@@ -1,5 +1,6 @@
 import os
 import sys
+import math
 import time
 import asyncio
 import logging
@@ -18,7 +19,6 @@ from mongoengine import connect, disconnect_all, DEFAULT_CONNECTION_NAME, Docume
 
 # ToDo; Add 'upsidedown text to everything' easter egg
 # ToDo; Add stats for time added (also rework chodebot & user documents to keep track & write script to scrape past logs to build data)
-# ToDo; Add XP Bar to the top_bar first long dash (colour code purple to show current xp to next level, blue for boosted xp (akin to wow xp bar))
 
 if getattr(sys, 'frozen', False):
     application_path = f"{os.path.dirname(sys.executable)}\\_internal"
@@ -553,10 +553,14 @@ def cls():
 
 
 def colour(colour_: str, str_: str) -> str:
-    if colour_ == "cyan":
+    if colour_ == "blue":
+        colour_ = Fore.BLUE
+    elif colour_ == "cyan":
         colour_ = Fore.CYAN
     elif colour_ == "green":
         colour_ = Fore.GREEN
+    elif colour_ == "purple":
+        colour_ = Fore.MAGENTA
     elif colour_ == "red":
         colour_ = Fore.RED
     else:
@@ -2064,8 +2068,12 @@ async def special_command(key_stroke: str):
 
 async def top_bar(left_side: str) -> str:
     try:
-        channel_document = await refresh_document_channel()
         user_document = await refresh_document_user()
+        channel_document = await refresh_document_channel()
+        level_check = user_document['data_user']['rank']['level'] + 1
+        xp_perc = int(user_document['data_user']['rank']['xp'] / ((150 * float((level_check / 2) * level_check)) * level_check) * 100)
+        xp_boost = math.ceil(user_document['data_user']['rank']['boost'] / ((150 * float((level_check / 2) * level_check)) * level_check) * 100)
+        dashes = f"{colour('purple', '-' * (xp_perc - xp_boost))}{colour('blue', '-' * xp_boost)}{'-' * (len(long_dashes) - xp_perc - xp_boost)}"
         always_show = bot.settings['types_always_display'][bot.settings['types_always_display'].index(read_file(bot.data_settings['types_always_display'], str))]
         if always_show == bot.settings['types_always_display'][0]:
             right_side = f"{numberize(user_document['data_games']['fish']['auto']['cast'])}/{channel_document['data_games']['fish']['upgrades']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit']}"
@@ -2076,8 +2084,8 @@ async def top_bar(left_side: str) -> str:
         elif always_show == bot.settings['types_always_display'][3]:
             right_side = numberize(user_document['data_user']['rank']['xp'])
         else:
-            return f"{left_side}\n{long_dashes}"
-        return f"{left_side}{' ' * (len(long_dashes) - (len(left_side) + len(str(right_side))))}{right_side}\n{long_dashes}"
+            return f"{left_side}\n{dashes}"
+        return f"{left_side}{' ' * (len(long_dashes) - (len(left_side) + len(str(right_side))))}{right_side}\n{dashes}"
     except Exception as error_creating_top_bar:
         await bot.error_msg("top_bar", "Generic Error", error_creating_top_bar)
         return left_side
