@@ -2071,14 +2071,31 @@ async def top_bar(left_side: str) -> str:
         user_document = await refresh_document_user()
         channel_document = await refresh_document_channel()
         level_check = user_document['data_user']['rank']['level']
-        level_check += 1
-        xp_perc = int(user_document['data_user']['rank']['xp'] / ((150 * float((level_check / 2) * level_check)) * level_check) * 100)
-        xp_boost = math.ceil(user_document['data_user']['rank']['boost'] / ((150 * float((level_check / 2) * level_check)) * level_check) * 100)
-        dashes = f"{colour('purple' if xp_perc > 0 else 'blue' if xp_boost > 0 else 'normal', str(level_check - 1))}" \
-                 f"{colour('purple', '-' * xp_perc)}" \
-                 f"{colour('blue', '-' * min(len(long_dashes) - xp_perc - len(str(level_check - 1)) - len(str(level_check)), xp_boost))}" \
-                 f"{'-' * (len(long_dashes) - len(str(level_check - 1)) - len(str(level_check)) - xp_perc - xp_boost)}" \
-                 f"{colour('blue' if xp_boost + xp_perc >= 100 else 'normal', str(level_check))}"
+        level_current = list(str(level_check))
+        level_check_list = list(str(level_check + 1))
+        level_before = level_check - 1
+        level_mult = 1.0
+        if level_check > 1:
+            level_mult += float((level_check / 2) * level_check)
+        level_before_mult = 1.0
+        if level_before > 1:
+            level_before_mult += float((level_before / 2) * level_before)
+        xp_needed_current = (150 * level_mult) * level_check
+        xp_needed_last = (150 * level_before_mult) * level_before
+        xp_needed = xp_needed_current - xp_needed_last
+        xp_into_level = user_document['data_user']['rank']['xp'] - xp_needed_last
+        xp_perc = math.floor(min(max(xp_into_level / xp_needed, 0), 1) * 100)
+        xp_boost = math.ceil(((user_document['data_user']['rank']['xp'] + user_document['data_user']['rank']['boost']) / xp_needed) * 10)
+
+        dashes_ = ""
+        for n, digit in enumerate(level_current):
+            dashes_ += colour('purple' if xp_perc > n else 'blue' if xp_boost > n else 'normal', str(digit))
+        dashes_ += f"{colour('purple', '-' * max(0, (xp_perc - len(level_current))))}"
+        dashes_ += f"{colour('blue', '-' * min(xp_boost, len(long_dashes) - xp_perc - len(level_check_list) - (len(level_current) if xp_perc <= 0 else 0)))}"
+        dashes_ += f"{'-' * max(0, (len(long_dashes) - len(level_check_list) - (len(level_current) if xp_perc <= 0 else 0) - xp_perc - xp_boost))}"
+        for n, digit in enumerate(level_check_list):
+            dashes_ += colour('purple' if xp_perc + len(level_current) - len(long_dashes) > n else 'blue' if (xp_perc + xp_boost + len(level_current)) - len(long_dashes) > n else 'normal', str(digit))
+
         always_show = bot.settings['types_always_display'][bot.settings['types_always_display'].index(read_file(bot.data_settings['types_always_display'], str))]
         if always_show == bot.settings['types_always_display'][0]:
             right_side = f"{numberize(user_document['data_games']['fish']['auto']['cast'])}/{channel_document['data_games']['fish']['upgrades']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit']}"
@@ -2089,8 +2106,8 @@ async def top_bar(left_side: str) -> str:
         elif always_show == bot.settings['types_always_display'][3]:
             right_side = numberize(user_document['data_user']['rank']['xp'])
         else:
-            return f"{left_side}\n{dashes}"
-        return f"{left_side}{' ' * (len(long_dashes) - (len(left_side) + len(str(right_side))))}{right_side}\n{dashes}"
+            return f"{left_side}\n{dashes_}"
+        return f"{left_side}{' ' * (len(long_dashes) - (len(left_side) + len(str(right_side))))}{right_side}\n{dashes_}"
     except Exception as error_creating_top_bar:
         await bot.error_msg("top_bar", "Generic Error", error_creating_top_bar)
         return left_side
