@@ -2075,7 +2075,7 @@ async def top_bar(left_side: str) -> str:
             level_check += 1
         xp_perc = int(user_document['data_user']['rank']['xp'] / ((150 * float((level_check / 2) * level_check)) * level_check) * 100)
         xp_boost = math.ceil(user_document['data_user']['rank']['boost'] / ((150 * float((level_check / 2) * level_check)) * level_check) * 100)
-        dashes = f"{colour('purple' if xp_perc > 0 else 'normal', str(level_check - 1))}{colour('purple', '-' * (xp_perc - len(str(level_check - 1)) - xp_boost))}{colour('blue', '-' * xp_boost)}{'-' * (len(long_dashes) - len(str(level_check)) - xp_perc)}{colour('blue' if xp_boost + xp_perc == 100 else 'normal', str(level_check))}"
+        dashes = f"{colour('purple' if xp_perc > 0 else 'normal', str(level_check - 1))}{colour('purple', '-' * (xp_perc - len(str(level_check - 1)) - xp_boost))}{colour('blue', '-' * xp_boost)}{'-' * (len(long_dashes) - len(str(level_check)) - xp_perc)}{colour('blue' if xp_boost + xp_perc >= 100 else 'normal', str(level_check))}"
         always_show = bot.settings['types_always_display'][bot.settings['types_always_display'].index(read_file(bot.data_settings['types_always_display'], str))]
         if always_show == bot.settings['types_always_display'][0]:
             right_side = f"{numberize(user_document['data_games']['fish']['auto']['cast'])}/{channel_document['data_games']['fish']['upgrades']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit']}"
