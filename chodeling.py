@@ -2070,31 +2070,48 @@ async def top_bar(left_side: str) -> str:
     try:
         user_document = await refresh_document_user()
         channel_document = await refresh_document_channel()
-        level_check = user_document['data_user']['rank']['level']
-        level_current = list(str(level_check))
-        level_check_list = list(str(level_check + 1))
-        level_before = level_check - 1
-        level_mult = 1.0
-        if level_check > 1:
-            level_mult += float((level_check / 2) * level_check)
-        level_before_mult = 1.0
-        if level_before > 1:
-            level_before_mult += float((level_before / 2) * level_before)
-        xp_needed_current = (150 * level_mult) * level_check
+
+        boost = user_document['data_user']['rank']['boost']
+        level = user_document['data_user']['rank']['level']
+        xp = user_document['data_user']['rank']['xp']
+
+        level_before = level - 1
+        level_mult = 1.0 + ((level / 2) * level if level > 1 else 0)
+        level_before_mult = 1.0 + ((level_before / 2) * level_before if level_before > 1 else 0)
+
+        xp_needed_current = (150 * level_mult) * level
         xp_needed_last = (150 * level_before_mult) * level_before
         xp_needed = xp_needed_current - xp_needed_last
-        xp_into_level = user_document['data_user']['rank']['xp'] - xp_needed_last
-        xp_perc = math.floor(min(max(xp_into_level / xp_needed, 0), 1) * 100)
-        xp_boost = math.ceil(((xp_into_level + user_document['data_user']['rank']['boost']) / xp_needed) * 10)
+        xp_into_level = xp - xp_needed_last
+
+        base_ratio = max(0, min(xp_into_level / xp_needed, 1))
+        boosted_ratio = max(0, min((xp_into_level + boost) / xp_needed, 1))
+
+        base_slots = math.floor(base_ratio * len(long_dashes))
+        boosted_slots = math.floor(boosted_ratio * len(long_dashes)) - base_slots
+        empty_slots = len(long_dashes) - base_slots - boosted_slots
+
+        slots = []
+        slots.extend(["purple"] * base_slots)
+        slots.extend(["blue"] * boosted_slots)
+        slots.extend(["normal"] * empty_slots)
+
+        left_str = str(level)
+        right_str = str(level + 1)
+
+        for i, digit in enumerate(left_str):
+            slots[i] = (slots[i], digit)
+
+        for i, digit in enumerate(reversed(right_str)):
+            slots[-(i + 1)] = (slots[-(i + 1)], digit)
 
         dashes_ = ""
-        for n, digit in enumerate(level_current):
-            dashes_ += colour('purple' if xp_perc > n else 'blue' if xp_boost > n else 'normal', str(digit))
-        dashes_ += f"{colour('purple', '-' * max(0, (xp_perc - len(level_current))))}"
-        dashes_ += f"{colour('blue', '-' * min(xp_boost, len(long_dashes) - xp_perc - len(level_check_list) - (len(level_current) if xp_perc <= 0 else 0)))}"
-        dashes_ += f"{'-' * max(0, (len(long_dashes) - len(level_check_list) - (len(level_current) if xp_perc <= 0 else 0) - xp_perc - xp_boost))}"
-        for n, digit in enumerate(level_check_list):
-            dashes_ += colour('purple' if xp_perc + len(level_current) - len(long_dashes) > n else 'blue' if (xp_perc + xp_boost + len(level_current)) - len(long_dashes) > n else 'normal', str(digit))
+        for s in slots:
+            if isinstance(s, tuple):
+                color, char = s
+                dashes_ += colour(color, char)
+            else:
+                dashes_ += colour(s, "-")
 
         always_show = bot.settings['types_always_display'][bot.settings['types_always_display'].index(read_file(bot.data_settings['types_always_display'], str))]
         if always_show == bot.settings['types_always_display'][0]:
