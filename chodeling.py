@@ -2085,7 +2085,7 @@ async def top_bar(left_side: str) -> str:
         xp_needed = xp_needed_current - xp_needed_last
         xp_into_level = user_document['data_user']['rank']['xp'] - xp_needed_last
         xp_perc = math.floor(min(max(xp_into_level / xp_needed, 0), 1) * 100)
-        xp_boost = math.ceil(((user_document['data_user']['rank']['xp'] + user_document['data_user']['rank']['boost']) / xp_needed) * 10)
+        xp_boost = math.ceil(((xp_into_level + user_document['data_user']['rank']['boost']) / xp_needed) * 10)
 
         dashes_ = ""
         for n, digit in enumerate(level_current):
