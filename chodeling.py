@@ -2082,7 +2082,7 @@ async def top_bar(left_side: str) -> str:
         xp_needed_current = (150 * level_mult) * level
         xp_needed_last = (150 * level_before_mult) * level_before
         xp_needed = xp_needed_current - xp_needed_last
-        xp_into_level = xp - xp_needed_last
+        xp_into_level = max(0, xp - xp_needed_last)
 
         base_ratio = max(0, min(xp_into_level / xp_needed, 1))
         boosted_ratio = max(0, min((xp_into_level + boost) / xp_needed, 1))
