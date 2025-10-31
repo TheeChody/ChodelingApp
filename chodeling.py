@@ -52,9 +52,10 @@ class BotSetup(Twitch):
         self.bot = Twitch
         self.data_settings = {
             "flash": f"{directories['data']}flash.txt",
-            "types_heist": f"{directories['data']}types_heist.txt",
             "types_always_display": f"{directories['data']}types_always_display.txt",
-            "types_sort": f"{directories['data']}types_sort.txt"
+            "types_heist": f"{directories['data']}types_heist.txt",
+            "types_sort": f"{directories['data']}types_sort.txt",
+            "types_xp_display": f"{directories['data']}types_xp_display.txt"
         }
         self.commands_available = {
             "general": [
@@ -204,6 +205,10 @@ class BotSetup(Twitch):
                 "quantity",
                 "value",
                 "value_individual"
+            ),
+            "types_xp_display": (
+                "xp_percent",
+                "xp_progress"
             )
         }
         self.special_commands = {
@@ -345,6 +350,7 @@ async def app_settings():
                            "Enter 2 To Change Default Sorting Variable\n"
                            "Enter 3 To Change Flash Settings\n"
                            "Enter 4 To Change Default Heist Crew\n"
+                           "Enter 5 To Change Default XP Display\n"
                            "Enter 0 To Return To Main Menu\n")
         if user_input.isdigit():
             user_input = int(user_input)
@@ -410,6 +416,8 @@ async def app_settings():
                         await bot.invalid_entry(str)
             elif user_input == 4:
                 await set_setting("types_heist")
+            elif user_input == 5:
+                await set_setting("types_xp_display")
             else:
                 await bot.invalid_entry(int)
         elif user_input in bot.special_commands.values():
@@ -2118,7 +2126,14 @@ async def top_bar(left_side: str) -> str:
         base_slots = math.floor(base_ratio * len_limit)
         boosted_slots = math.floor(boosted_ratio * len_limit) - base_slots
         empty_slots = len_limit - base_slots - boosted_slots
-        xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}"
+
+        xp_show = bot.settings['types_xp_display'][bot.settings['types_xp_display'].index(read_file(bot.data_settings['types_xp_display'], str))]
+        if xp_show == bot.settings['types_xp_display'][0]:
+            xp_text = f"{base_slots}%"
+        elif xp_show == bot.settings['types_xp_display'][1]:
+            xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}"
+        else:
+            xp_text = f"{xp_show} INVALID SETTING"
         center_index = (len_limit - len(xp_text)) // 2
 
         slots = []
@@ -2156,7 +2171,7 @@ async def top_bar(left_side: str) -> str:
         elif always_show == bot.settings['types_always_display'][3]:
             right_side = f"{numberize(user_document['data_user']['rank']['xp'])}/{numberize(xp_needed_current)}"
         else:
-            right_side = f"{always_show} INVALID CHOICE"
+            right_side = f"{always_show} INVALID SETTING"
         return f"{left_side}{' ' * (len(long_dashes) - (len(left_side) + len(str(right_side))))}{right_side}\n{dashes_}"
     except Exception as error_creating_top_bar:
         await bot.error_msg("top_bar", "Generic Error", error_creating_top_bar)
