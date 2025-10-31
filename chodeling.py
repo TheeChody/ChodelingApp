@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import math
 import time
@@ -189,7 +190,7 @@ class BotSetup(Twitch):
                 "auto_cast_remaining",
                 "level",
                 "points",
-                "points_xp",
+                "points_xp"
             ),
             "types_heist": (
                 "basic_bitches",
@@ -280,6 +281,11 @@ class BotSetup(Twitch):
         input("Required Permissions Not Satisfied!!\n"
               "Hit Enter to go back")
         await bot.go_back()
+
+    @staticmethod
+    async def not_programmed():
+        print("Not Programmed Yet")
+        await asyncio.sleep(3)
 
 
 async def app_settings():
@@ -529,17 +535,13 @@ async def chodeling_stats():
             elif user_input == 4:
                 await display_stats_gamble()
             elif user_input == 5:
-                print("Not Programmed Yet")
-                await asyncio.sleep(3)
+                await display_stats_heist()
             elif user_input == 6:
-                print("Not Programmed Yet")
-                await asyncio.sleep(3)
+                await display_stats_jail()
             elif user_input == 7:
-                print("Not Programmed Yet")
-                await asyncio.sleep(3)
+                await display_stats_other()
             elif user_input == 8:
-                print("Not Programmed Yet")
-                await asyncio.sleep(3)
+                await display_stats_tag()
             else:
                 await bot.invalid_entry(int)
         elif user_input in bot.special_commands.values():
@@ -776,8 +778,9 @@ async def display_stats_bingo():
                         await bot.invalid_entry(str)
             elif user_input == 2:
                 async def call_action(action_to_call: str):
-                    status = await send_chat_msg(f"!bingo action {action_to_call.title()}")
-                    print(f"Call '{action_to_call.title()}' {'Succeeded' if status else 'Failed'}")
+                    action_to_call_form = title(action_to_call)
+                    status = await send_chat_msg(f"!bingo action {action_to_call_form}")
+                    print(f"Call '{action_to_call_form}' {'Succeeded' if status else 'Failed'}")
                     await asyncio.sleep(2)
 
                 while True:
@@ -1669,6 +1672,22 @@ async def display_stats_gamble():
             await bot.invalid_entry(str)
 
 
+async def display_stats_heist():
+    await bot.not_programmed()
+
+
+async def display_stats_jail():
+    await bot.not_programmed()
+
+
+async def display_stats_other():
+    await bot.not_programmed()
+
+
+async def display_stats_tag():
+    await bot.not_programmed()
+
+
 async def fetch_setting(setting: str) -> int | tuple:
     if setting == "sortby":
         try:
@@ -2066,44 +2085,57 @@ async def special_command(key_stroke: str):
         await msg_fail(f"{fortime()}: Error in 'special_command' -- key_stroke; {key_stroke} -- Generic Error\n{update_number_error}", error=True)
 
 
+def title(text, ignore_chars='_/\\|:;".,('):
+    def capitalize_match(match):
+        word = match.group(0)
+        return word[0].upper() + word[1:].lower() if word else word
+
+    return re.compile(rf"([^{re.escape(ignore_chars)}\s]+)").sub(capitalize_match, text)
+
+
 async def top_bar(left_side: str) -> str:
     try:
         user_document = await refresh_document_user()
-        channel_document = await refresh_document_channel()
 
         boost = user_document['data_user']['rank']['boost']
         level = user_document['data_user']['rank']['level']
         xp = user_document['data_user']['rank']['xp']
-
         level_before = level - 1
+
         level_mult = 1.0 + ((level / 2) * level if level > 1 else 0)
         level_before_mult = 1.0 + ((level_before / 2) * level_before if level_before > 1 else 0)
 
-        xp_needed_current = (150 * level_mult) * level
-        xp_needed_last = (150 * level_before_mult) * level_before
+        level_const = 150
+        xp_needed_current = (level_const * level_mult) * level
+        xp_needed_last = (level_const * level_before_mult) * level_before
         xp_needed = xp_needed_current - xp_needed_last
         xp_into_level = max(0, xp - xp_needed_last)
 
         base_ratio = max(0, min(xp_into_level / xp_needed, 1))
         boosted_ratio = max(0, min((xp_into_level + boost) / xp_needed, 1))
 
-        base_slots = math.floor(base_ratio * len(long_dashes))
-        boosted_slots = math.floor(boosted_ratio * len(long_dashes)) - base_slots
-        empty_slots = len(long_dashes) - base_slots - boosted_slots
+        len_limit = len(long_dashes)
+        base_slots = math.floor(base_ratio * len_limit)
+        boosted_slots = math.floor(boosted_ratio * len_limit) - base_slots
+        empty_slots = len_limit - base_slots - boosted_slots
+        xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}"
+        center_index = (len_limit - len(xp_text)) // 2
 
         slots = []
         slots.extend(["purple"] * base_slots)
         slots.extend(["blue"] * boosted_slots)
         slots.extend(["normal"] * empty_slots)
 
-        left_str = str(level)
-        right_str = str(level + 1)
+        for n, digit in enumerate(str(level)):
+            slots[n] = (slots[n], digit)
 
-        for i, digit in enumerate(left_str):
-            slots[i] = (slots[i], digit)
+        for n, digit in enumerate(reversed(str(level + 1))):
+            slots[-(n + 1)] = (slots[-(n + 1)], digit)
 
-        for i, digit in enumerate(reversed(right_str)):
-            slots[-(i + 1)] = (slots[-(i + 1)], digit)
+        for n, char in enumerate(xp_text):
+            slot_index = center_index + n
+            if 0 <= slot_index < len(slots):
+                slots[slot_index] = (slots[slot_index], char)
 
         dashes_ = ""
         for s in slots:
@@ -2115,19 +2147,20 @@ async def top_bar(left_side: str) -> str:
 
         always_show = bot.settings['types_always_display'][bot.settings['types_always_display'].index(read_file(bot.data_settings['types_always_display'], str))]
         if always_show == bot.settings['types_always_display'][0]:
-            right_side = f"{numberize(user_document['data_games']['fish']['auto']['cast'])}/{channel_document['data_games']['fish']['upgrades']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit']}"
+            channel_document = await refresh_document_channel()
+            right_side = f"{numberize(user_document['data_games']['fish']['auto']['cast'])}/{numberize(channel_document['data_games']['fish']['upgrades']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit'])}"
         elif always_show == bot.settings['types_always_display'][1]:
             right_side = f"{user_document['data_user']['rank']['level']:,}"
         elif always_show == bot.settings['types_always_display'][2]:
             right_side = numberize(user_document['data_user']['rank']['points'])
         elif always_show == bot.settings['types_always_display'][3]:
-            right_side = numberize(user_document['data_user']['rank']['xp'])
+            right_side = f"{numberize(user_document['data_user']['rank']['xp'])}/{numberize(xp_needed_current)}"
         else:
-            return f"{left_side}\n{dashes_}"
+            right_side = f"{always_show} INVALID CHOICE"
         return f"{left_side}{' ' * (len(long_dashes) - (len(left_side) + len(str(right_side))))}{right_side}\n{dashes_}"
     except Exception as error_creating_top_bar:
         await bot.error_msg("top_bar", "Generic Error", error_creating_top_bar)
-        return left_side
+        return f"{left_side}\n{long_dashes}"
 
 
 async def run():
