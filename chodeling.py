@@ -2266,7 +2266,7 @@ async def top_bar(left_side: str) -> str:
 
         xp_show = bot.settings['types_xp_display'][bot.settings['types_xp_display'].index(read_file(bot.data_settings['types_xp_display'], str))]
         if xp_show == bot.settings['types_xp_display'][0]:
-            xp_text = f"{base_slots}%"
+            xp_text = f"{base_ratio * 100:.2f}%"
         elif xp_show == bot.settings['types_xp_display'][1]:
             xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}"
         else:
