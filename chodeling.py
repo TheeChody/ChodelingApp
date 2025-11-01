@@ -208,7 +208,8 @@ class BotSetup(Twitch):
             ),
             "types_xp_display": (
                 "xp_percent",
-                "xp_progress"
+                "xp_progress",
+                "xp_both"
             )
         }
         self.special_commands = {
@@ -362,7 +363,7 @@ async def app_settings():
             elif user_input == 2:
                 await set_setting("types_sort")
             elif user_input == 3:
-                async def set_setting(setting_type: str):
+                async def set_setting_flash(setting_type: str):
                     while True:
                         cls()
                         print(await top_bar(f"{setting_type.title()} Setting"))
@@ -405,9 +406,9 @@ async def app_settings():
                             await bot.go_back()
                             break
                         elif user_input == 1:
-                            await set_setting("frequency")
+                            await set_setting_flash("frequency")
                         elif user_input == 2:
-                            await set_setting("speed")
+                            await set_setting_flash("speed")
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
@@ -1879,23 +1880,6 @@ def fortime() -> str:
     return str(datetime.datetime.now().strftime('%y-%m-%d %H:%M:%S'))
 
 
-def fortime_long(time):
-    try:
-        return str(time.strftime("%y:%m:%d:%H:%M:%S"))[1:]
-    except Exception as e:
-        logger.error(f"Error creating formatted_long_time -- {e}")
-        return None
-
-
-async def get_long_sec(time):
-    try:
-        y, mo, d, h, mi, s = time.split(":")
-        return int(y) * 31536000 + int(mo) * 2628288 + int(d) * 86400 + int(h) * 3600 + int(mi) * 60 + int(s)
-    except Exception as e:
-        logger.error(f"Error creating long_second -- {e}")
-        return None
-
-
 async def log_shutdown(logger_list: list):
     logging.shutdown()
     for entry in logger_list:
@@ -2183,8 +2167,8 @@ async def special_command(key_stroke: str):
             user_document = await refresh_document_user()
             if user_document['data_games']['gamble']['last'] is None:
                 pass
-            elif await get_long_sec(fortime_long(now_time)) - await get_long_sec(fortime_long(user_document['data_games']['gamble']['last'])) < 600:
-                wait_time = 600 - (await get_long_sec(fortime_long(now_time)) - await get_long_sec(fortime_long(user_document['data_games']['gamble']['last'])))
+            elif now_time.timestamp() - user_document['data_games']['gamble']['last'].timestamp() < 600:
+                wait_time = int(600 - (now_time.timestamp() - user_document['data_games']['gamble']['last'].timestamp()))
                 reason = f"Gotta Wait {str(datetime.timedelta(seconds=wait_time)).title()}"
             if reason == "":
                 status = await send_chat_msg("!bet")
@@ -2207,8 +2191,8 @@ async def special_command(key_stroke: str):
             user_document = await refresh_document_user()
             if user_document['data_games']['heist']['gamble']['last'] is None:
                 pass
-            elif await get_long_sec(fortime_long(now_time)) - await get_long_sec(fortime_long(user_document['data_games']['heist']['gamble']['last'])) < 21600:
-                wait_time = 21600 - (await get_long_sec(fortime_long(now_time)) - await get_long_sec(fortime_long(user_document['data_games']['heist']['gamble']['last'])))
+            elif now_time.timestamp() - user_document['data_games']['heist']['gamble']['last'].timestamp() < 21600:
+                wait_time = int(21600 - (now_time.timestamp() - user_document['data_games']['heist']['gamble']['last'].timestamp()))
                 reason = f"Gotta Wait {str(datetime.timedelta(seconds=wait_time)).title()}"
             if reason == "":
                 status = await send_chat_msg(f"!heist {await fetch_setting('heist')}")
@@ -2269,6 +2253,8 @@ async def top_bar(left_side: str) -> str:
             xp_text = f"{base_ratio * 100:.2f}%"
         elif xp_show == bot.settings['types_xp_display'][1]:
             xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}"
+        elif xp_show == bot.settings['types_xp_display'][2]:
+            xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}({base_ratio * 100:.2f}%)"
         else:
             xp_text = f"{xp_show} INVALID SETTING"
         center_index = (len_limit - len(xp_text)) // 2
@@ -2295,7 +2281,7 @@ async def top_bar(left_side: str) -> str:
                 color, char = s
                 dashes_ += colour(color, char)
             else:
-                dashes_ += colour(s, "-")
+                dashes_ += colour(s, "#")
 
         always_show = bot.settings['types_always_display'][bot.settings['types_always_display'].index(read_file(bot.data_settings['types_always_display'], str))]
         if always_show == bot.settings['types_always_display'][0]:
