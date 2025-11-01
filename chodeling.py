@@ -268,7 +268,7 @@ class BotSetup(Twitch):
 
     @staticmethod
     async def error_msg(function_name: str, error_type: any, error_str: any):
-        logger.error(f"{fortime()}: Error in '{function_name}' -- {error_type}\n{error_str}")
+        logger.error(f"{long_dashes}\n{fortime()}: Error in '{function_name}' -- {error_type}\n{error_str}\n{long_dashes}")
         await asyncio.sleep(5)
 
     @staticmethod
@@ -1681,7 +1681,143 @@ async def display_stats_gamble():
 
 
 async def display_stats_heist():
-    await bot.not_programmed()
+    async def display_crew(key_crew: str):
+        async def display_date(key_date: str):
+            async def display_time(key_time: str):
+                cls()
+                print(await top_bar(f"{key_date.replace('-', '/')} {key_time} Heist Result"))
+                for heist_key, heist_data in user_document['data_games']['heist']['gamble']['history'][key_crew][key_date][key_time].items():
+                    print(f"{heist_key.replace('_', ' ').title()}: {heist_data if type(heist_data) not in (float, int) else numberize(heist_data)}")
+                input(f"{long_dashes}\n"
+                      f"Hit Enter To Go Back")
+                await bot.go_back()
+
+            while True:
+                cls()
+                options = []
+                user_document = await refresh_document_user()
+                print(await top_bar(f"{key_date.replace('-', '/')} Heists"))
+                try:
+                    for n, game_time in enumerate(user_document['data_games']['heist']['gamble']['history'][key_crew][key_date].keys(), start=1):
+                        options.append(f"{n}. {game_time}")
+                except Exception as error_printing_times:
+                    await bot.error_msg("display_stats_heist", f"Error building times options for {key_date}", error_printing_times)
+                user_input = input(f"{f'{long_dashes}{nl}{nl.join(options)}{nl}' if len(options) > 0 else ''}"
+                                   f"{f'{long_dashes}{nl}Enter # Or Type Time To View{nl}' if len(options) > 0 else ''}"
+                                   f"Enter 0 To Go Back\n"
+                                   f"Enter Nothing To Refresh\n")
+                if user_input == "":
+                    pass
+                elif user_input.isdigit():
+                    user_input = int(user_input)
+                    if user_input == 0:
+                        await bot.go_back()
+                        break
+                    elif user_input <= len(options):
+                        await display_time(remove_period_area(options[user_input - 1]))
+                    else:
+                        await bot.invalid_entry(int)
+                elif user_input in bot.special_commands.values():
+                    await special_command(user_input)
+                elif user_input.lower() in check_numbered_list(options):
+                    await display_time(user_input.lower())
+                else:
+                    await bot.invalid_entry(str)
+
+        while True:
+            cls()
+            options = []
+            user_document = await refresh_document_user()
+            print(await top_bar(f"{key_crew} Heist Dates"))
+            try:
+                for n, date in enumerate(user_document['data_games']['heist']['gamble']['history'][key_crew].keys(), start=1):
+                    options.append(f"{n}. {date}")
+            except Exception as error_building_crew_dates:
+                await bot.error_msg("display_stats_heist", "Error building crew dates", error_building_crew_dates)
+            user_input = input(f"{f'{long_dashes}{nl}{nl.join(options)}{nl}' if len(options) > 0 else ''}"
+                               f"{f'{long_dashes}{nl}Enter # Or Type Date To View{nl}' if len(options) > 0 else ''}"
+                               f"Enter 0 To Go Back\n"
+                               f"Enter Nothing To Refresh\n")
+            if user_input == "":
+                pass
+            elif user_input.isdigit():
+                user_input = int(user_input)
+                if user_input == 0:
+                    await bot.go_back()
+                    break
+                elif user_input <= len(options):
+                    await display_date(remove_period_area(options[user_input - 1]))
+                else:
+                    await bot.invalid_entry(int)
+            elif user_input in bot.special_commands.values():
+                await special_command(user_input)
+            elif user_input.lower() in check_numbered_list(options):
+                await display_date(user_input.lower())
+            else:
+                await bot.invalid_entry(str)
+
+    async def refresh_global_stats():
+        user_stats = {
+            "total_heists": 0,
+            "total_successful": 0,
+            "total_fail": 0,
+            "total_cost": 0,
+            "total_gain": 0,
+        }
+        try:
+            for game_dates in user_document['data_games']['heist']['gamble']['history'].values():
+                for game_times in game_dates.values():
+                    for game_data in game_times.values():
+                        user_stats['total_heists'] += 1
+                        user_stats['total_cost'] += game_data['heist_cost']
+                        if game_data['status']:
+                            user_stats['total_successful'] += 1
+                            user_stats['total_gain'] += game_data['points_gained']
+                        else:
+                            user_stats['total_fail'] += 1
+        except Exception as error_building_user_stats_global:
+            await bot.error_msg("display_stats_heist", "Error building user_stats global", error_building_user_stats_global)
+        return user_stats
+
+    while True:
+        cls()
+        options = []
+        user_document = await refresh_document_user()
+        user_stats = await refresh_global_stats()
+        print(await top_bar("Heist History"))
+        try:
+            for key, value in user_stats.items():
+                print(f"{key.replace('_', ' ').title()}: {numberize(value)}")
+            print(long_dashes)
+        except Exception as error_printing_user_stats_global:
+            await bot.error_msg("display_stats_heist", "Error printing user_stats global", error_printing_user_stats_global)
+        try:
+            for n, game_date in enumerate(user_document['data_games']['heist']['gamble']['history'].keys(), start=1):
+                options.append(f"{n}. {game_date}")
+        except Exception as error_building_crew_options:
+            await bot.error_msg("display_stats_heist", "Error building crew options", error_building_crew_options)
+        user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
+                           f"{long_dashes}\n"
+                           f"{f'Enter # Or Type Crew To View{nl}' if len(options) > 0 else ''}"
+                           f"Enter 0 To Go Back\n"
+                           f"Enter Nothing To Refresh\n")
+        if user_input == "":
+            pass
+        elif user_input.isdigit():
+            user_input = int(user_input)
+            if user_input == 0:
+                await bot.go_back()
+                break
+            elif user_input <= len(options):
+                await display_crew(remove_period_area(options[user_input - 1]))
+            else:
+                await bot.invalid_entry(int)
+        elif user_input in bot.special_commands.values():
+            await special_command(user_input)
+        elif user_input.lower() in check_numbered_list(options):
+            await display_crew(user_input.lower())
+        else:
+            await bot.invalid_entry(str)
 
 
 async def display_stats_jail():
@@ -1777,7 +1913,7 @@ async def on_message(msg: ChatMessage):
             return
         msg.text = msg.text.lower()
         if msg.user.id != bot.login_details['target_id']:
-            if f"@{user.display_name.lower()}" in msg.text:
+            if f"{user.display_name.lower()}" in msg.text:
                 await flash_window("attn")
         else:
             if msg.text.startswith(user.display_name.lower()) and "autocast expired" in msg.text:
@@ -1985,18 +2121,19 @@ def remove_period_area(var: str) -> str:
 async def send_chat_msg(msg: str):
     try:
         await bot.send_chat_message(bot.login_details['target_id'], user.id, msg)
+        return True
     except TwitchBackendException:
         try:
             await asyncio.sleep(3)
             await bot.send_chat_message(bot.login_details['target_id'], user.id, msg)
             logger.info(f"{fortime()}: TwitchBackendException Handled OK")
+            return True
         except Exception as error_twitch_backend:
             await bot.error_msg("send_chat_msg", "TwitchBackendException Handled FAIL", error_twitch_backend)
             return False
     except Exception as general_error:
         await bot.error_msg("send_chat_msg", "Generic Error", general_error)
         return False
-    return True
 
 
 def setup_logger(name: str, log_file: str, logger_list: list, level=logging.INFO):
@@ -2275,15 +2412,17 @@ def data_check():
 
 
 def hotkey_listen():
+    clear_code = '\033'
+    # clear_code = ''
     try:
-        keyboard.add_hotkey("ctrl+shift+b", lambda: keyboard.write(f"\x1b{bot.special_commands['bet']}\r"))
-        keyboard.add_hotkey("ctrl+shift+d+b", lambda: keyboard.write(f"\x1b{bot.special_commands['bbet']}\r"))
-        keyboard.add_hotkey("ctrl+shift+f", lambda: keyboard.write(f"\x1b{bot.special_commands['fish']}\r"))
-        keyboard.add_hotkey("ctrl+shift+h", lambda: keyboard.write(f"\x1b{bot.special_commands['heist']}\r"))
-        keyboard.add_hotkey("ctrl+shift+j", lambda: keyboard.write(f"\x1b{bot.special_commands['joints_count_update']}\r"))
-        # keyboard.add_hotkey("ctrl+shift+q", lambda: keyboard.write(f"\x1b{bot.special_commands['quit']}\r"))
-        keyboard.add_hotkey("ctrl+shift+r+b", lambda: keyboard.write(f"\x1b{bot.special_commands['fish_beet']}\r"))
-        keyboard.add_hotkey("ctrl+shift+r+s", lambda: keyboard.write(f"\x1b{bot.special_commands['fish_stroke']}\r"))
+        keyboard.add_hotkey("ctrl+shift+b", lambda: keyboard.write(f"{clear_code}{bot.special_commands['bet']}\r"))
+        keyboard.add_hotkey("ctrl+shift+d+b", lambda: keyboard.write(f"{clear_code}{bot.special_commands['bbet']}\r"))
+        keyboard.add_hotkey("ctrl+shift+f", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish']}\r"))
+        keyboard.add_hotkey("ctrl+shift+h", lambda: keyboard.write(f"{clear_code}{bot.special_commands['heist']}\r"))
+        keyboard.add_hotkey("ctrl+shift+j", lambda: keyboard.write(f"{clear_code}{bot.special_commands['joints_count_update']}\r"))
+        # keyboard.add_hotkey("ctrl+shift+q", lambda: keyboard.write(f"{clear_code}{bot.special_commands['quit']}\r"))
+        keyboard.add_hotkey("ctrl+shift+r+b", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish_beet']}\r"))
+        keyboard.add_hotkey("ctrl+shift+s+r", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish_stroke']}\r"))
         keyboard.wait()
     except Exception as e:
         logger.error(f"{fortime()}: Error in 'hotkey_listen' -- {e}")
