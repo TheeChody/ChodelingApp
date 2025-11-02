@@ -2102,7 +2102,7 @@ def remove_period_area(var: str) -> str:
         return var
 
 
-async def send_chat_msg(msg: str):
+async def send_chat_msg(msg: str) -> bool:
     try:
         await bot.send_chat_message(bot.login_details['target_id'], user.id, msg)
         return True
@@ -2132,8 +2132,9 @@ def setup_logger(name: str, log_file: str, logger_list: list, level=logging.INFO
         logger_list.append(f"{log_file}")
         return local_logger
     except Exception as e:
-        formatted_time = fortime()
-        print(f"{formatted_time}: ERROR in setup_logger - {name}/{log_file}/{level} -- {e}")
+        print(f"{fortime()}: ERROR in setup_logger - {name}/{log_file}/{level} -- {e}")
+        time.sleep(15)
+        logger_list.append(None)
         return None
 
 
@@ -2214,7 +2215,7 @@ async def special_command(key_stroke: str):
         await msg_fail(f"{fortime()}: Error in 'special_command' -- key_stroke; {key_stroke} -- Generic Error\n{update_number_error}", error=True)
 
 
-def title(text, ignore_chars='_/\\|:;".,('):
+def title(text, ignore_chars='_/\\|:;".,(') -> str:
     def capitalize_match(match):
         word = match.group(0)
         return word[0].upper() + word[1:].lower() if word else word
@@ -2242,21 +2243,21 @@ async def top_bar(left_side: str) -> str:
         xp_into_level = max(0, xp - xp_needed_last)
 
         base_ratio = max(0, min(xp_into_level / xp_needed, 1))
-        boosted_ratio = max(0, min(boost / xp_needed, 1))
+        boosted_ratio = max(0, min((xp_into_level + boost) / xp_needed, 1))
 
         len_limit = len(long_dashes)
         base_slots = math.floor(base_ratio * len_limit)
-        boosted_slots = math.floor(boosted_ratio * len_limit)
+        boosted_slots = math.floor(boosted_ratio * len_limit) - base_slots
         empty_slots = len_limit - base_slots - boosted_slots
 
         try:
             xp_show = bot.settings['types_xp_display'][bot.settings['types_xp_display'].index(read_file(bot.data_settings['types_xp_display'], str))]
             if xp_show == bot.settings['types_xp_display'][0]:
-                xp_text = f"{base_ratio * 100:.2f}%{f'|{boosted_ratio * 100:.2f}%' if boost > 0 else ''}"
+                xp_text = f"{base_ratio * 100:.2f}%{f'|{boost / xp_needed * 100:.2f}%' if boost > 0 else ''}"
             elif xp_show == bot.settings['types_xp_display'][1]:
                 xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}{f'|{numberize(boost)}' if boost > 0 else ''}"
             elif xp_show == bot.settings['types_xp_display'][2]:
-                xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}({base_ratio * 100:.2f}%){f'|{numberize(boost)}({boosted_ratio * 100:.2f}%)' if boost > 0 else ''}"
+                xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}({base_ratio * 100:.2f}%){f'|{numberize(boost)}({boost / xp_needed * 100:.2f}%)' if boost > 0 else ''}"
             else:
                 xp_text = f"{xp_show}#INVALID SETTING"
         except Exception as error_fetching_xp_show:
