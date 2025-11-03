@@ -2246,7 +2246,7 @@ async def top_bar(left_side: str) -> str:
         boosted_ratio = max(0, min((xp_into_level + boost) / xp_needed, 1))
 
         len_limit = len(long_dashes)
-        base_slots = math.ceil(base_ratio * len_limit)
+        base_slots = math.floor(base_ratio * len_limit)
         boosted_slots = math.floor(boosted_ratio * len_limit) - base_slots
         empty_slots = len_limit - base_slots - boosted_slots
 
