@@ -2253,11 +2253,11 @@ async def top_bar(left_side: str) -> str:
         try:
             xp_show = bot.settings['types_xp_display'][bot.settings['types_xp_display'].index(read_file(bot.data_settings['types_xp_display'], str))]
             if xp_show == bot.settings['types_xp_display'][0]:
-                xp_text = f"{base_ratio * 100:.2f}%{f'|{boost / xp_needed * 100:.2f}%' if boost > 0 else ''}"
+                xp_text = f"{base_ratio * 100:.2f}%{f'{xp_key * 3}{min(boost / xp_needed * 100, len_limit - (base_ratio * 100)):.2f}%' if boost > 0 else ''}"
             elif xp_show == bot.settings['types_xp_display'][1]:
-                xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}{f'|{numberize(boost)}' if boost > 0 else ''}"
+                xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}{f'{xp_key * 3}{numberize(boost)}' if boost > 0 else ''}"
             elif xp_show == bot.settings['types_xp_display'][2]:
-                xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}({base_ratio * 100:.2f}%){f'|{numberize(boost)}({boost / xp_needed * 100:.2f}%)' if boost > 0 else ''}"
+                xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}({base_ratio * 100:.2f}%){f'{xp_key * 3}{numberize(boost)}({min(boost / xp_needed * 100, len_limit - (base_ratio * 100)):.2f}%)' if boost > 0 else ''}"
             else:
                 xp_text = f"{xp_show}#INVALID SETTING"
         except Exception as error_fetching_xp_show:
