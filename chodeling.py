@@ -55,7 +55,8 @@ class BotSetup(Twitch):
             "types_always_display": f"{directories['data']}types_always_display.txt",
             "types_heist": f"{directories['data']}types_heist.txt",
             "types_sort": f"{directories['data']}types_sort.txt",
-            "types_xp_display": f"{directories['data']}types_xp_display.txt"
+            "types_xp_display": f"{directories['data']}types_xp_display.txt",
+            "xp_bar_key": f"{directories['data']}xp_bar_key.txt"
         }
         self.commands_available = {
             "general": [
@@ -234,6 +235,11 @@ class BotSetup(Twitch):
             AuthScope.USER_BOT,
             AuthScope.USER_WRITE_CHAT
         ]
+        self.variables = {}
+
+    def set_vars(self):
+        for setting, setting_path in self.data_settings.items():
+            self.variables[setting] = read_file(setting_path, str)
 
     @staticmethod
     async def check_permissions(user_id: str, perm_check: str) -> bool:
@@ -341,6 +347,7 @@ async def app_settings():
     async def write_var(key_write: str, var_write: str):
         with open(bot.data_settings[key_write], "w") as file:
             file.write(var_write.lower())
+        bot.variables[key_write] = var_write.lower()
         print(f"{key_write.replace('_', ' ').title()} Variable set to: {var_write.replace('_', ' ').title()}")
         await bot.go_back()
 
@@ -352,6 +359,7 @@ async def app_settings():
                            "Enter 3 To Change Flash Settings\n"
                            "Enter 4 To Change Default Heist Crew\n"
                            "Enter 5 To Change Default XP Display\n"
+                           "Enter 6 To Change XP Bar Key\n"
                            "Enter 0 To Return To Main Menu\n")
         if user_input.isdigit():
             user_input = int(user_input)
@@ -419,6 +427,32 @@ async def app_settings():
                 await set_setting("types_heist")
             elif user_input == 5:
                 await set_setting("types_xp_display")
+            elif user_input == 6:
+                while True:
+                    cls()
+                    print(await top_bar("Change XP Bar Key"))
+                    user_input = input(f"Enter Desired XP Bar Key\n"
+                                       f"(Only 1 Key (Future Pattern Compatibility))\n"
+                                       f"(If trying to set a number as 'xp bar key', use 'NUMBER' or \"NUMBER\")\n"
+                                       f"Enter 0 To Go Back\n")
+                    if user_input.isdigit():
+                        user_input = int(user_input)
+                        if user_input == 0:
+                            await bot.go_back()
+                            break
+                        else:
+                            await bot.invalid_entry(int)
+                    elif len(user_input) != 1 and not user_input.startswith(("'", '"')):
+                        await bot.invalid_entry(str)
+                    elif user_input.startswith(("'", '"')):
+                        user_input = user_input.replace("'", "").replace('"', '')
+                        if not await check_var('xp_bar_key', user_input):
+                            await write_var('xp_bar_key', user_input)
+                            break
+                    else:
+                        if not await check_var('xp_bar_key', user_input):
+                            await write_var('xp_bar_key', user_input)
+                            break
             else:
                 await bot.invalid_entry(int)
         elif user_input in bot.special_commands.values():
@@ -507,20 +541,32 @@ async def chodeling_commands():
 
 async def chodeling_leaderboards():
     async def show_leaderboard(leaderboard_name: str, leaderboard: dict):
+        def space(item: str):
+            return f"{' ' * (left_space - len(item))}{item}"
+
         cls()
+        left_space = 0
+        for value in leaderboard.values():
+            if type(value) == list:
+                len_comp = len(f"{numberize(value[0])}({numberize(value[1])}) | ")
+            else:
+                len_comp = len(f"{numberize(value)} | ")
+            left_space = len_comp if len_comp > left_space else left_space
         print(await top_bar(f"{leaderboard_name} Leaderboard"))
         for n, (key, value) in enumerate(leaderboard.items(), start=1):
             try:
                 str_ = f"{' ' if n < 10 else ''}{n}. "
                 if type(value) == list:
                     if len(value) > 2:
-                        for item in value:
-                            str_ += f"{numberize(item)} | "
+                        str_ += space(f"{numberize(value[0])} | ")
+                        for nn, item in enumerate(value):
+                            if nn != 0:
+                                str_ += f"{numberize(item)} | "
                     else:
-                        str_ += f"{numberize(value[0])}({numberize(value[1])}) | "
+                        str_ += space(f'{numberize(value[0])}({numberize(value[1])}) | ')
                     str_ += f"{key}"
                 else:
-                    str_ += f"{numberize(value)} | {key}"
+                    str_ += f"{space(f'{numberize(value)} | ')}{key}"
                 print(str_)
             except Exception as error_printing_str_:
                 await bot.error_msg("chodeling_leaderboards", "Error printing str_", error_printing_str_)
@@ -530,14 +576,14 @@ async def chodeling_leaderboards():
     while True:
         cls()
         print(await top_bar("Chodeling Leaderboards"))
-        user_input = input(f"Enter 1 To View Fish Leaderboards\n"
-                           f"Enter 2 To View Heist Leaderboards\n"
-                           f"Enter 3 To View Jail Leaderboards\n"
-                           f"Enter 4 To View Rank Leaderboards\n"
-                           f"Enter 5 To View Free Pack Leaderboards\n"
-                           f"Enter 6 To View Fight Leaderboards\n"
-                           f"Enter 7 To View Bingo Leaderboards\n"
-                           f"Enter 8 To View Gamble Leaderboards\n"
+        user_input = input(f"Enter 1 To View Bingo Leaderboards\n"
+                           f"Enter 2 To View Fight Leaderboards\n"
+                           f"Enter 3 To View Fish Leaderboards\n"
+                           f"Enter 4 To View Free Pack Leaderboards\n"
+                           f"Enter 5 To View Gamble Leaderboards\n"
+                           f"Enter 6 To View Heist Leaderboards\n"
+                           f"Enter 7 To View Jail Leaderboards\n"
+                           f"Enter 8 To View Rank Leaderboards\n"
                            f"Enter 0 To Go Back\n")
         if user_input.isdigit():
             user_input = int(user_input)
@@ -545,6 +591,81 @@ async def chodeling_leaderboards():
                 await bot.go_back()
                 break
             elif user_input == 1:
+                while True:
+                    async def build_bingo_dict(type_: str):
+                        dict_ = {}
+                        chodelings_collection = mongo_db.twitch.get_collection('users')
+                        chodelings = chodelings_collection.find({})
+                        for chodeling in chodelings:
+                            total = 0
+                            major = 0
+                            major_points = 0
+                            minor = 0
+                            minor_points = 0
+                            for date_ in chodeling['data_games']['bingo']['history'].values():
+                                for data_ in date_.values():
+                                    try:
+                                        total += 1
+                                        major += 1 if data_['major_bingo'] else 0
+                                        if 'points_won' in data_:
+                                            major_points += data_['points_won']
+                                        minor += 1 if data_['minor_bingo'] else 0
+                                        minor_points += 10000 if data_['minor_bingo'] else 0
+                                    except Exception as error_building_bingo_dict:
+                                        await bot.error_msg("chodeling_leaderboards", "Error building bingo dictionary", error_building_bingo_dict)
+                                        continue
+                            dict_[chodeling['name']] = total if type_ == "total" else [major, major_points] if type_ == "major" else [minor, minor_points]
+                        return dict_
+
+                    cls()
+                    print(await top_bar("Bingo Leaderboard Options"))
+                    user_input = input(f"Enter 1 To Sort By Total Games\n"
+                                       f"Enter 2 To Sort By Major Bingo's\n"
+                                       f"Enter 3 To Sort By Minor Bingo's\n"
+                                       f"Enter 0 To Go Back\n")
+                    if user_input.isdigit():
+                        user_input = int(user_input)
+                        if user_input == 0:
+                            await bot.go_back()
+                            break
+                        elif user_input == 1:
+                            dict_ = await build_bingo_dict("total")
+                            await show_leaderboard("Total Bingo Games", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                        elif user_input == 2:
+                            dict_ = await build_bingo_dict("major")
+                            await show_leaderboard("Total Bingo Games", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
+                        elif user_input == 3:
+                            dict_ = await build_bingo_dict("minor")
+                            await show_leaderboard("Total Bingo Games", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
+                        else:
+                            await bot.invalid_entry(int)
+                    elif user_input in bot.special_commands.values():
+                        await special_command(user_input)
+                    else:
+                        await bot.invalid_entry(str)
+            elif user_input == 2:
+                dict_ = {}
+                chodelings_collection = mongo_db.twitch.get_collection('users')
+                chodelings = chodelings_collection.find({})
+                for chodeling in chodelings:
+                    total = 0
+                    for name_ in chodeling['data_games']['fight']['aggressor'].values():
+                        for data_ in name_.values():
+                            try:
+                                total += len(data_.values())
+                            except Exception as error_:
+                                await bot.error_msg("chodeling_leaderboard", "Error building fight aggressor dictionary", error_)
+                                continue
+                    for name_ in chodeling['data_games']['fight']['defender'].values():
+                        for data_ in name_.values():
+                            try:
+                                total += len(data_.values())
+                            except Exception as error_:
+                                await bot.error_msg("chodeling_leaderboard", "Error building fight defender dictionary", error_)
+                                continue
+                    dict_[chodeling['name']] = total
+                await show_leaderboard("Fight", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+            elif user_input == 3:
                 while True:
                     cls()
                     print(await top_bar("Fish Leaderboards"))
@@ -613,7 +734,59 @@ async def chodeling_leaderboards():
                         await special_command(user_input)
                     else:
                         await bot.invalid_entry(str)
-            elif user_input == 2:
+            elif user_input == 4:
+                dict_ = {}
+                chodelings_collection = mongo_db.twitch.get_collection('users')
+                chodelings = chodelings_collection.find({})
+                for chodeling in chodelings:
+                    try:
+                        dict_[chodeling['name']] = len(chodeling['data_user']['dates']['daily_cards'][2])
+                    except Exception as error_:
+                        await bot.error_msg("chodeling_leaderboard", "Error building free_pack dictionary", error_)
+                        continue
+                await show_leaderboard("Free Pack", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+            elif user_input == 5:
+                while True:
+                    async def build_gamble_dict(type_: str):
+                        dict_ = {}
+                        chodelings_collection = mongo_db.twitch.get_collection('users')
+                        chodelings = chodelings_collection.find({})
+                        for chodeling in chodelings:
+                            try:
+                                gamble_ = chodeling['data_games']['gamble']
+                                dict_[chodeling['name']] = gamble_['total'] if type_ == "total" else [gamble_['won'], gamble_['total_won']] if type_ == "won" else [gamble_['lost'], gamble_['total_lost']]
+                            except Exception as error_building_gamble_dict:
+                                await bot.error_msg("chodeling_leaderboards", "Error building gamble dict", error_building_gamble_dict)
+                                continue
+                        return dict_
+
+                    cls()
+                    print(await top_bar("Gamble Leaderboard Options"))
+                    user_input = input(f"Enter 1 To Sort By Total Gambles\n"
+                                       f"Enter 2 To Sort By Total Wins\n"
+                                       f"Enter 3 To Sort By Total Losses\n"
+                                       f"Enter 0 To Go Back\n")
+                    if user_input.isdigit():
+                        user_input = int(user_input)
+                        if user_input == 0:
+                            await bot.go_back()
+                            break
+                        elif user_input == 1:
+                            dict_ = await build_gamble_dict("total")
+                            await show_leaderboard("Gamble Total", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                        elif user_input == 2:
+                            dict_ = await build_gamble_dict("won")
+                            await show_leaderboard("Gamble Wins", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
+                        elif user_input == 3:
+                            dict_ = await build_gamble_dict("lost")
+                            await show_leaderboard("Gamble Losses", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
+                        else:
+                            await bot.invalid_entry(int)
+                    elif user_input in bot.special_commands.values():
+                        await special_command(user_input)
+                    else:
+                        await bot.invalid_entry(str)
+            elif user_input == 6:
                 dict_ = {}
                 chodelings_collection = mongo_db.twitch.get_collection('users')
                 chodelings = chodelings_collection.find({})
@@ -629,7 +802,7 @@ async def chodeling_leaderboards():
                                     continue
                     dict_[chodeling['name']] = total
                 await show_leaderboard("Heist", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
-            elif user_input == 3:
+            elif user_input == 7:
                 dict_ = {}
                 chodelings_collection = mongo_db.twitch.get_collection('users')
                 chodelings = chodelings_collection.find({})
@@ -645,7 +818,7 @@ async def chodeling_leaderboards():
                                     continue
                     dict_[chodeling['name']] = total
                 await show_leaderboard("Jail", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
-            elif user_input == 4:
+            elif user_input == 8:
                 while True:
                     cls()
                     print(await top_bar("Rank Leaderboards"))
@@ -685,133 +858,6 @@ async def chodeling_leaderboards():
                                     await bot.error_msg("chodeling_leaderboard", "Error building rank xp dictionary", error_)
                                     continue
                             await show_leaderboard("XP Points", dict_)
-                        else:
-                            await bot.invalid_entry(int)
-                    elif user_input in bot.special_commands.values():
-                        await special_command(user_input)
-                    else:
-                        await bot.invalid_entry(str)
-            elif user_input == 5:
-                dict_ = {}
-                chodelings_collection = mongo_db.twitch.get_collection('users')
-                chodelings = chodelings_collection.find({})
-                for chodeling in chodelings:
-                    try:
-                        dict_[chodeling['name']] = len(chodeling['data_user']['dates']['daily_cards'][2])
-                    except Exception as error_:
-                        await bot.error_msg("chodeling_leaderboard", "Error building free_pack dictionary", error_)
-                        continue
-                await show_leaderboard("Free Pack", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
-            elif user_input == 6:
-                dict_ = {}
-                chodelings_collection = mongo_db.twitch.get_collection('users')
-                chodelings = chodelings_collection.find({})
-                for chodeling in chodelings:
-                    total = 0
-                    for name_ in chodeling['data_games']['fight']['aggressor'].values():
-                        for data_ in name_.values():
-                            try:
-                                total += len(data_.values())
-                            except Exception as error_:
-                                await bot.error_msg("chodeling_leaderboard", "Error building fight aggressor dictionary", error_)
-                                continue
-                    for name_ in chodeling['data_games']['fight']['defender'].values():
-                        for data_ in name_.values():
-                            try:
-                                total += len(data_.values())
-                            except Exception as error_:
-                                await bot.error_msg("chodeling_leaderboard", "Error building fight defender dictionary", error_)
-                                continue
-                    dict_[chodeling['name']] = total
-                await show_leaderboard("Fight", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
-            elif user_input == 7:
-                while True:
-                    async def build_bingo_dict(type_: str):
-                        dict_ = {}
-                        chodelings_collection = mongo_db.twitch.get_collection('users')
-                        chodelings = chodelings_collection.find({})
-                        for chodeling in chodelings:
-                            total = 0
-                            major = 0
-                            major_points = 0
-                            minor = 0
-                            minor_points = 0
-                            for date_ in chodeling['data_games']['bingo']['history'].values():
-                                for data_ in date_.values():
-                                    try:
-                                        total += 1
-                                        major += 1 if data_['major_bingo'] else 0
-                                        if 'points_won' in data_:
-                                            major_points += data_['points_won']
-                                        minor += 1 if data_['minor_bingo'] else 0
-                                        minor_points += 10000 if data_['minor_bingo'] else 0
-                                    except Exception as error_building_bingo_dict:
-                                        await bot.error_msg("chodeling_leaderboards", "Error building bingo dictionary", error_building_bingo_dict)
-                                        continue
-                            dict_[chodeling['name']] = total if type_ == "total" else [major, major_points] if type_ == "major" else [minor, minor_points]
-                        return dict_
-
-                    cls()
-                    print(await top_bar("Bingo Leaderboard Options"))
-                    user_input = input(f"Enter 1 To Sort By Total Games\n"
-                                       f"Enter 2 To Sort By Major Bingo's\n"
-                                       f"Enter 3 To Sort By Minor Bingo's\n"
-                                       f"Enter 0 To Go Back\n")
-                    if user_input.isdigit():
-                        user_input = int(user_input)
-                        if user_input == 0:
-                            await bot.go_back()
-                            break
-                        elif user_input == 1:
-                            dict_ = await build_bingo_dict("total")
-                            await show_leaderboard("Total Bingo Games", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
-                        elif user_input == 2:
-                            dict_ = await build_bingo_dict("major")
-                            await show_leaderboard("Total Bingo Games", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
-                        elif user_input == 3:
-                            dict_ = await build_bingo_dict("minor")
-                            await show_leaderboard("Total Bingo Games", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
-                        else:
-                            await bot.invalid_entry(int)
-                    elif user_input in bot.special_commands.values():
-                        await special_command(user_input)
-                    else:
-                        await bot.invalid_entry(str)
-            elif user_input == 8:
-                while True:
-                    async def build_gamble_dict(type_: str):
-                        dict_ = {}
-                        chodelings_collection = mongo_db.twitch.get_collection('users')
-                        chodelings = chodelings_collection.find({})
-                        for chodeling in chodelings:
-                            try:
-                                gamble_ = chodeling['data_games']['gamble']
-                                dict_[chodeling['name']] = gamble_['total'] if type_ == "total" else [gamble_['won'], gamble_['total_won']] if type_ == "won" else [gamble_['lost'], gamble_['total_lost']]
-                            except Exception as error_building_gamble_dict:
-                                await bot.error_msg("chodeling_leaderboards", "Error building gamble dict", error_building_gamble_dict)
-                                continue
-                        return dict_
-
-                    cls()
-                    print(await top_bar("Gamble Leaderboard Options"))
-                    user_input = input(f"Enter 1 To Sort By Total Gambles\n"
-                                       f"Enter 2 To Sort By Total Wins\n"
-                                       f"Enter 3 To Sort By Total Losses\n"
-                                       f"Enter 0 To Go Back\n")
-                    if user_input.isdigit():
-                        user_input = int(user_input)
-                        if user_input == 0:
-                            await bot.go_back()
-                            break
-                        elif user_input == 1:
-                            dict_ = await build_gamble_dict("total")
-                            await show_leaderboard("Gamble Total", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
-                        elif user_input == 2:
-                            dict_ = await build_gamble_dict("won")
-                            await show_leaderboard("Gamble Wins", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
-                        elif user_input == 3:
-                            dict_ = await build_gamble_dict("lost")
-                            await show_leaderboard("Gamble Losses", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
@@ -2170,20 +2216,20 @@ async def display_stats_tag():
 async def fetch_setting(setting: str) -> int | tuple:
     if setting == "sortby":
         try:
-            return bot.settings['types_sort'].index(read_file(bot.data_settings['types_sort'], str))
+            return bot.settings['types_sort'].index(bot.variables['types_sort'])
         except ValueError:
-            await bot.error_msg("fetch_setting", f"{read_file(bot.data_settings['types_sort'], str)}' is not valid!! (Returning Index 0)", ValueError)
+            await bot.error_msg("fetch_setting", f"{bot.variables['types_sort']}' is not valid!! (Returning Index 0)", ValueError)
             return 0
     elif setting == "flash":
         try:
-            flash_frequency, flash_speed = read_file(bot.data_settings['flash'], str).split(', ', maxsplit=1)
+            flash_frequency, flash_speed = bot.variables['flash'].split(', ', maxsplit=1)
             return int(flash_frequency), float(flash_speed)
         except Exception as error_returning_flash:
             await bot.error_msg("fetch_setting", "Returning flash Settings (Default '4, 0.5' Returned)", error_returning_flash)
             return 4, 0.5
     elif setting == "heist":
         try:
-            return bot.settings['types_heist'].index(read_file(bot.data_settings['types_heist'], str)) + 1
+            return bot.settings['types_heist'].index(bot.variables['types_heist']) + 1
         except Exception as error_returning_heist:
             await bot.error_msg("fetch_setting", "heist_setting", error_returning_heist)
             return 0
@@ -2541,10 +2587,7 @@ async def special_command(key_stroke: str):
         #     pass
         else:
             reason = f"{key_stroke} NOT VALID"
-        if status:
-            await print_status(status)
-        else:
-            await print_status(status, reason)
+        await print_status(status, reason)
     except Exception as update_number_error:
         await print_status(status, f"{fortime()}: Error in 'special_command' -- key_stroke; {key_stroke} -- Generic Error\n{update_number_error}", True)
 
@@ -2559,7 +2602,7 @@ def title(text, ignore_chars='_/\\|:;".,(') -> str:
 
 async def top_bar(left_side: str) -> str:
     try:
-        xp_key = "#"
+        xp_key = bot.variables['xp_bar_key']
         level_const = 150
         user_document = await refresh_document_user()
         boost = user_document['data_user']['rank']['boost']
@@ -2579,7 +2622,7 @@ async def top_bar(left_side: str) -> str:
         boosted_slots = math.floor(boosted_ratio * len_limit) - base_slots
         empty_slots = len_limit - base_slots - boosted_slots
         try:
-            xp_show = bot.settings['types_xp_display'][bot.settings['types_xp_display'].index(read_file(bot.data_settings['types_xp_display'], str))]
+            xp_show = bot.variables['types_xp_display']
             if xp_show == bot.settings['types_xp_display'][0]:
                 xp_text = f"{base_ratio * 100:.2f}%{f'{xp_key * 3}{min(boost / xp_needed * 100, len_limit - (base_ratio * 100)):.2f}%' if boost > 0 else ''}"
             elif xp_show == bot.settings['types_xp_display'][1]:
@@ -2589,7 +2632,7 @@ async def top_bar(left_side: str) -> str:
             else:
                 xp_text = f"{xp_show}#INVALID SETTING"
         except Exception as error_fetching_xp_show:
-            xp_text = f"INVALID SETTING '{read_file(bot.data_settings['types_xp_display'], str)}' | {str(error_fetching_xp_show).upper()}".replace(' ', xp_key)
+            xp_text = f"INVALID SETTING '{bot.variables['types_xp_display']}' | {str(error_fetching_xp_show).upper()}".replace(' ', xp_key)
         center_index = (len_limit - len(xp_text)) // 2
         slots = []
         slots.extend(["purple"] * base_slots)
@@ -2611,7 +2654,7 @@ async def top_bar(left_side: str) -> str:
             else:
                 dashes_ += colour(s, xp_key)
         try:
-            always_show = bot.settings['types_always_display'][bot.settings['types_always_display'].index(read_file(bot.data_settings['types_always_display'], str))]
+            always_show = bot.variables['types_always_display']
             if always_show == bot.settings['types_always_display'][0]:
                 channel_document = await refresh_document_channel()
                 right_side = f"{numberize(user_document['data_games']['fish']['auto']['cast'])}/{numberize(channel_document['data_games']['fish']['upgrades']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit'])}"
@@ -2721,7 +2764,9 @@ def data_check():
     for setting, path in bot.data_settings.items():
         if not os.path.exists(path):
             if setting == "flash":
-                write_new_file(path, f"4, 0.5")
+                write_new_file(path, "4, 0.5")
+            elif setting == "xp_bar_key":
+                write_new_file(path, "#")
             else:
                 write_new_file(path, str(bot.settings[setting][0]))
 
@@ -2753,6 +2798,7 @@ if __name__ == "__main__":
     else:
         bot = BotSetup(bot_id, bot_secret)
         data_check()
+        bot.set_vars()
         while True:
             cls()
             user_input = input("Enter 1 to start bot\nEnter 0 to exit\n")
