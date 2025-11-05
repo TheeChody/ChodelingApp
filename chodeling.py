@@ -609,6 +609,10 @@ async def chodeling_leaderboards():
                             await show_leaderboard("Total Lines Cut", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
                         else:
                             await bot.invalid_entry(int)
+                    elif user_input in bot.special_commands.values():
+                        await special_command(user_input)
+                    else:
+                        await bot.invalid_entry(str)
             elif user_input == 2:
                 dict_ = {}
                 chodelings_collection = mongo_db.twitch.get_collection('users')
@@ -769,6 +773,10 @@ async def chodeling_leaderboards():
                             await show_leaderboard("Total Bingo Games", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
                         else:
                             await bot.invalid_entry(int)
+                    elif user_input in bot.special_commands.values():
+                        await special_command(user_input)
+                    else:
+                        await bot.invalid_entry(str)
             elif user_input == 8:
                 while True:
                     async def build_gamble_dict(type_: str):
@@ -806,6 +814,10 @@ async def chodeling_leaderboards():
                             await show_leaderboard("Gamble Losses", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
                         else:
                             await bot.invalid_entry(int)
+                    elif user_input in bot.special_commands.values():
+                        await special_command(user_input)
+                    else:
+                        await bot.invalid_entry(str)
             else:
                 await bot.invalid_entry(int)
         elif user_input in bot.special_commands.values():
@@ -1018,11 +1030,11 @@ async def display_stats_bingo():
         try:
             if None not in (user_document['data_games']['bingo']['current_game']['game_type'], channel_document['data_games']['bingo']['current_game']['game_type']):
                 options = ["Enter 1 To View Game Info", "Enter 2 To View Your Board"]
+            options.append("Enter 3 To View History")
+            if channel_document['data_games']['bingo']['current_game']['game_type'] is not None and user_document['data_games']['bingo']['current_game']['game_type'] is None:
+                options.append("Enter 4 To Join Bingo Game")
         except Exception as error_building_options:
             await bot.error_msg("display_stats_bingo", "Error Building Options", error_building_options)
-        options.append("Enter 3 To View History")
-        if channel_document['data_games']['bingo']['current_game']['game_type'] is not None and user_document['data_games']['bingo']['current_game']['game_type'] is None:
-            options.append("Enter 4 To Join Bingo Game")
         user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
                            "Enter 0 To Go Back\n")
         if user_input.isdigit():
@@ -1325,16 +1337,15 @@ async def display_stats_bingo():
                         await bot.invalid_entry(str)
             elif user_input == 4:
                 if user_document['data_games']['bingo']['current_game']['game_type'] is not None:
-                    print(f"You're already in a {user_document['data_games']['bingo']['current_game']['game_type'].replace('_', ' ').title()} game!!")
-                    input("Hit Enter To Go Back")
+                    input(f"You're already in a {user_document['data_games']['bingo']['current_game']['game_type'].replace('_', ' ').title()} game!!\n"
+                          "Hit Enter To Go Back")
+                    await bot.go_back()
+                elif channel_document['data_games']['bingo']['current_game']['game_type'] is None:
+                    input("There is no game running!!\n"
+                          "Hit Enter To Go Back")
                     await bot.go_back()
                 else:
-                    status = await send_chat_msg("!bingo join")
-                    if status:
-                        print(f"{channel_document['data_games']['bingo']['current_game']['game_type'].replace('_', ' ').title()} Joined!")
-                    else:
-                        print(f"{channel_document['data_games']['bingo']['current_game']['game_type'].replace('_', ' ').title()} NOT Joined!")
-                    await asyncio.sleep(3)
+                    await print_status(await send_chat_msg("!bingo join"))
             else:
                 await bot.invalid_entry(int)
         elif user_input in bot.special_commands.values():
@@ -2425,6 +2436,18 @@ def remove_period_area(var: str) -> str:
         return var
 
 
+async def print_status(status: bool, reason: str = "", error: bool = False):
+    if status:
+        print(f"Message Sent To Chat Successfully")
+    else:
+        print_msg = f"Message Send Failed\n{reason}"
+        if error:
+            await bot.error_msg("special_command", "msg_fail", print_msg)
+        else:
+            print(print_msg)
+    await asyncio.sleep(2 if status else 10 if error else 5)
+
+
 async def send_chat_msg(msg: str) -> bool:
     try:
         await bot.send_chat_message(bot.login_details['target_id'], user.id, msg)
@@ -2472,18 +2495,6 @@ def style(style_: str, str_: str) -> str:
 
 
 async def special_command(key_stroke: str):
-    async def msg_success():
-        print(f"Message Sent To Chat Successfully")
-        await asyncio.sleep(2)
-
-    async def msg_fail(reason: str, error: bool = False):
-        print_msg = f"Message Send Failed\n{reason}"
-        if error:
-            await bot.error_msg("special_command", "msg_fail", print_msg)
-        else:
-            print(print_msg)
-            await asyncio.sleep(3)
-
     status, reason = False, ""
     try:
         if key_stroke == bot.special_commands['bet']:
@@ -2531,11 +2542,11 @@ async def special_command(key_stroke: str):
         else:
             reason = f"{key_stroke} NOT VALID"
         if status:
-            await msg_success()
+            await print_status(status)
         else:
-            await msg_fail(reason)
+            await print_status(status, reason)
     except Exception as update_number_error:
-        await msg_fail(f"{fortime()}: Error in 'special_command' -- key_stroke; {key_stroke} -- Generic Error\n{update_number_error}", error=True)
+        await print_status(status, f"{fortime()}: Error in 'special_command' -- key_stroke; {key_stroke} -- Generic Error\n{update_number_error}", True)
 
 
 def title(text, ignore_chars='_/\\|:;".,(') -> str:
