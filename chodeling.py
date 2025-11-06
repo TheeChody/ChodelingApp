@@ -2695,11 +2695,11 @@ async def run():
     while True:
         cls()
         try:
-            user_input = input(f"{await top_bar('Main Menu')}\n"
-                               "Enter 1 To View Profile\n"
+            print(await top_bar('Main Menu'))
+            user_input = input("Enter 1 To View Profile\n"
                                "Enter 2 To View Commands\n"
                                "Enter 3 To View Leaderboards\n"
-                               # "Enter 8 To Enter Profile Settings\n"
+                               "Enter 8 To Enter Profile Settings\n"
                                "Enter 9 To Change App Settings\n"
                                "Enter 0 To Shutdown Bot\n")
             if user_input.isdigit():
@@ -2713,6 +2713,8 @@ async def run():
                     await chodeling_commands()
                 elif user_input == 3:
                     await chodeling_leaderboards()
+                elif user_input == 8:
+                    await bot.not_programmed()
                 elif user_input == 9:
                     await app_settings()
                 else:
