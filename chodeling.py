@@ -445,7 +445,10 @@ async def app_settings():
                     elif len(user_input) != 1 and not user_input.startswith(("'", '"')):
                         await bot.invalid_entry(str)
                     elif user_input.startswith(("'", '"')):
-                        user_input = user_input.replace("'", "").replace('"', '')
+                        if user_input.startswith("'"):
+                            user_input = user_input.replace("'", "")
+                        else:
+                            user_input = user_input.replace('"', '')
                         if not await check_var('xp_bar_key', user_input):
                             await write_var('xp_bar_key', user_input)
                             break
@@ -2602,8 +2605,8 @@ def title(text, ignore_chars='_/\\|:;".,(') -> str:
 
 async def top_bar(left_side: str) -> str:
     try:
-        xp_key = bot.variables['xp_bar_key']
         level_const = 150
+        xp_key = bot.variables['xp_bar_key']
         user_document = await refresh_document_user()
         boost = user_document['data_user']['rank']['boost']
         level = user_document['data_user']['rank']['level']
@@ -2611,7 +2614,7 @@ async def top_bar(left_side: str) -> str:
         level_before = level - 1
         level_mult = 1.0 + ((level / 2) * level if level > 1 else 0)
         level_before_mult = 1.0 + ((level_before / 2) * level_before if level_before > 1 else 0)
-        xp_needed_current = (level_const * level_mult) * level
+        xp_needed_current = ((level_const * level_mult) * level)
         xp_needed_last = (level_const * level_before_mult) * level_before
         xp_needed = xp_needed_current - xp_needed_last
         xp_into_level = max(0, xp - xp_needed_last)
@@ -2622,15 +2625,14 @@ async def top_bar(left_side: str) -> str:
         boosted_slots = math.floor(boosted_ratio * len_limit) - base_slots
         empty_slots = len_limit - base_slots - boosted_slots
         try:
-            xp_show = bot.variables['types_xp_display']
-            if xp_show == bot.settings['types_xp_display'][0]:
+            if bot.variables['types_xp_display'] == bot.settings['types_xp_display'][0]:
                 xp_text = f"{base_ratio * 100:.2f}%{f'{xp_key * 3}{min(boost / xp_needed * 100, len_limit - (base_ratio * 100)):.2f}%' if boost > 0 else ''}"
-            elif xp_show == bot.settings['types_xp_display'][1]:
+            elif bot.variables['types_xp_display'] == bot.settings['types_xp_display'][1]:
                 xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}{f'{xp_key * 3}{numberize(boost)}' if boost > 0 else ''}"
-            elif xp_show == bot.settings['types_xp_display'][2]:
+            elif bot.variables['types_xp_display'] == bot.settings['types_xp_display'][2]:
                 xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}({base_ratio * 100:.2f}%){f'{xp_key * 3}{numberize(boost)}({boost / xp_needed * 100:.2f}%)' if boost > 0 else ''}"
             else:
-                xp_text = f"{xp_show}#INVALID SETTING"
+                xp_text = f"{bot.variables['types_xp_display']}{xp_key * 3}INVALID SETTING".replace(' ', xp_key)
         except Exception as error_fetching_xp_show:
             xp_text = f"INVALID SETTING '{bot.variables['types_xp_display']}' | {str(error_fetching_xp_show).upper()}".replace(' ', xp_key)
         center_index = (len_limit - len(xp_text)) // 2
@@ -2654,18 +2656,17 @@ async def top_bar(left_side: str) -> str:
             else:
                 dashes_ += colour(s, xp_key)
         try:
-            always_show = bot.variables['types_always_display']
-            if always_show == bot.settings['types_always_display'][0]:
+            if bot.variables['types_always_display'] == bot.settings['types_always_display'][0]:
                 channel_document = await refresh_document_channel()
                 right_side = f"{numberize(user_document['data_games']['fish']['auto']['cast'])}/{numberize(channel_document['data_games']['fish']['upgrades']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit'])}"
-            elif always_show == bot.settings['types_always_display'][1]:
+            elif bot.variables['types_always_display'] == bot.settings['types_always_display'][1]:
                 right_side = f"{user_document['data_user']['rank']['level']:,}"
-            elif always_show == bot.settings['types_always_display'][2]:
+            elif bot.variables['types_always_display'] == bot.settings['types_always_display'][2]:
                 right_side = numberize(user_document['data_user']['rank']['points'])
-            elif always_show == bot.settings['types_always_display'][3]:
+            elif bot.variables['types_always_display'] == bot.settings['types_always_display'][3]:
                 right_side = f"{numberize(user_document['data_user']['rank']['xp'])}/{numberize(xp_needed_current)}"
             else:
-                right_side = f"{always_show} INVALID SETTING"
+                right_side = f"{bot.variables['types_always_display']} INVALID SETTING"
         except Exception as error_fetching_always_show:
             right_side = f"INVALID SETTING | {str(error_fetching_always_show).upper()}"
         return f"{left_side}{' ' * (len(long_dashes) - (len(left_side) + len(str(right_side))))}{right_side}\n{dashes_}"
