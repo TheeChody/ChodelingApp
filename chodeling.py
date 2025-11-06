@@ -302,11 +302,18 @@ class BotSetup(Twitch):
 
 async def app_settings():
     async def check_var(key_check: str, var_check: str) -> bool:
-        if read_file(bot.data_settings[key_check], str) == var_check.lower():
+        if read_file(bot.data_settings[key_check], str) == var_check:
             print(f"Your sort type is already set to {var_check.replace('_', ' ').title()}")
             await bot.go_back()
             return True
         return False
+
+    async def write_var(key_write: str, var_write: str):
+        with open(bot.data_settings[key_write], "w") as file:
+            file.write(var_write)
+        bot.variables[key_write] = var_write
+        print(f"{key_write.replace('_', ' ').title()} Variable set to: {var_write.replace('_', ' ').title()}")
+        await bot.go_back()
 
     async def set_setting(setting_key: str):
         while True:
@@ -343,13 +350,6 @@ async def app_settings():
                     break
             else:
                 await bot.invalid_entry(str)
-
-    async def write_var(key_write: str, var_write: str):
-        with open(bot.data_settings[key_write], "w") as file:
-            file.write(var_write.lower())
-        bot.variables[key_write] = var_write.lower()
-        print(f"{key_write.replace('_', ' ').title()} Variable set to: {var_write.replace('_', ' ').title()}")
-        await bot.go_back()
 
     while True:
         cls()
