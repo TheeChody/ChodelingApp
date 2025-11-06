@@ -2614,7 +2614,7 @@ async def top_bar(left_side: str) -> str:
         level_before = level - 1
         level_mult = 1.0 + ((level / 2) * level if level > 1 else 0)
         level_before_mult = 1.0 + ((level_before / 2) * level_before if level_before > 1 else 0)
-        xp_needed_current = ((level_const * level_mult) * level)
+        xp_needed_current = (level_const * level_mult) * level
         xp_needed_last = (level_const * level_before_mult) * level_before
         xp_needed = xp_needed_current - xp_needed_last
         xp_into_level = max(0, xp - xp_needed_last)
@@ -2626,13 +2626,13 @@ async def top_bar(left_side: str) -> str:
         empty_slots = len_limit - base_slots - boosted_slots
         try:
             if bot.variables['types_xp_display'] == bot.settings['types_xp_display'][0]:
-                xp_text = f"{base_ratio * 100:.2f}%{f'{xp_key * 3}{min(boost / xp_needed * 100, len_limit - (base_ratio * 100)):.2f}%' if boost > 0 else ''}"
+                xp_text = f"{base_ratio * 100:.2f}%{f'{xp_key * 3}{(((xp_into_level + boost) / xp_needed) * 100) - base_slots:.2f}%' if boost > 0 else ''}"
             elif bot.variables['types_xp_display'] == bot.settings['types_xp_display'][1]:
                 xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}{f'{xp_key * 3}{numberize(boost)}' if boost > 0 else ''}"
             elif bot.variables['types_xp_display'] == bot.settings['types_xp_display'][2]:
-                xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}({base_ratio * 100:.2f}%){f'{xp_key * 3}{numberize(boost)}({boost / xp_needed * 100:.2f}%)' if boost > 0 else ''}"
+                xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}({base_ratio * 100:.2f}%){f'{xp_key * 3}{numberize(boost)}({(((xp_into_level + boost) / xp_needed) * 100) - base_slots:.2f}%)' if boost > 0 else ''}"
             else:
-                xp_text = f"{bot.variables['types_xp_display']}{xp_key * 3}INVALID SETTING".replace(' ', xp_key)
+                xp_text = f"INVALID SETTING '{bot.variables['types_xp_display']}'".replace(' ', xp_key)
         except Exception as error_fetching_xp_show:
             xp_text = f"INVALID SETTING '{bot.variables['types_xp_display']}' | {str(error_fetching_xp_show).upper()}".replace(' ', xp_key)
         center_index = (len_limit - len(xp_text)) // 2
@@ -2648,13 +2648,13 @@ async def top_bar(left_side: str) -> str:
             slot_index = center_index + n
             if 0 <= slot_index < len(slots):
                 slots[slot_index] = (slots[slot_index], char)
-        dashes_ = ""
+        dashes = ""
         for s in slots:
             if isinstance(s, tuple):
                 color, char = s
-                dashes_ += colour(color, char)
+                dashes += colour(color, char)
             else:
-                dashes_ += colour(s, xp_key)
+                dashes += colour(s, xp_key)
         try:
             if bot.variables['types_always_display'] == bot.settings['types_always_display'][0]:
                 channel_document = await refresh_document_channel()
@@ -2666,10 +2666,10 @@ async def top_bar(left_side: str) -> str:
             elif bot.variables['types_always_display'] == bot.settings['types_always_display'][3]:
                 right_side = f"{numberize(user_document['data_user']['rank']['xp'])}/{numberize(xp_needed_current)}"
             else:
-                right_side = f"{bot.variables['types_always_display']} INVALID SETTING"
+                right_side = f"INVALID SETTING '{bot.variables['types_always_display']}'"
         except Exception as error_fetching_always_show:
             right_side = f"INVALID SETTING | {str(error_fetching_always_show).upper()}"
-        return f"{left_side}{' ' * (len(long_dashes) - (len(left_side) + len(str(right_side))))}{right_side}\n{dashes_}"
+        return f"{left_side}{' ' * (len(long_dashes) - (len(left_side) + len(str(right_side))))}{right_side}\n{dashes}"
     except Exception as error_creating_top_bar:
         await bot.error_msg("top_bar", "Generic Error", error_creating_top_bar)
         return f"{left_side}\n{long_dashes}"
