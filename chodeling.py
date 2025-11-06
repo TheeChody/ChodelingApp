@@ -2847,11 +2847,11 @@ async def top_bar(left_side: str) -> str:
         empty_slots = bot.length - base_slots - boosted_slots
         try:
             if bot.variables['types_xp_display'] == bot.settings['types_xp_display'][0]:
-                xp_text = f"{base_ratio * 100:.2f}%{f'{xp_key * 3}{numberize((((xp_into_level + boost) / xp_needed) * 100) - base_slots)}%' if boost > 0 else ''}"
+                xp_text = f"{base_ratio * 100:.2f}%{f'{xp_key * 3}{numberize((boost / xp_needed) * 100)}%' if boost > 0 else ''}"
             elif bot.variables['types_xp_display'] == bot.settings['types_xp_display'][1]:
                 xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}{f'{xp_key * 3}{numberize(boost)}' if boost > 0 else ''}"
             elif bot.variables['types_xp_display'] == bot.settings['types_xp_display'][2]:
-                xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}({base_ratio * 100:.2f}%){f'{xp_key * 3}{numberize(boost)}({numberize((((xp_into_level + boost) / xp_needed) * 100) - base_slots)}%)' if boost > 0 else ''}"
+                xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}({base_ratio * 100:.2f}%){f'{xp_key * 3}{numberize(boost)}({numberize((boost / xp_needed) * 100)}%)' if boost > 0 else ''}"
             else:
                 xp_text = f"INVALID SETTING '{bot.variables['types_xp_display']}'".replace(' ', xp_key)
         except Exception as error_fetching_xp_show:
