@@ -43,7 +43,7 @@ db_string = os.getenv("db_string")
 
 nl = "\n"
 logger_list = []
-long_dashes = "-" * 100
+long_dashes = "=" * 100
 
 
 class BotSetup(Twitch):
@@ -647,27 +647,70 @@ async def chodeling_leaderboards():
                     else:
                         await bot.invalid_entry(str)
             elif user_input == 2:
-                dict_ = {}
-                chodelings_collection = mongo_db.twitch.get_collection('users')
-                chodelings = chodelings_collection.find({})
-                for chodeling in chodelings:
-                    total = 0
-                    for name_ in chodeling['data_games']['fight']['aggressor'].values():
-                        for data_ in name_.values():
-                            try:
-                                total += len(data_.values())
-                            except Exception as error_:
-                                await bot.error_msg("chodeling_leaderboard", "Error building fight aggressor dictionary", error_)
-                                continue
-                    for name_ in chodeling['data_games']['fight']['defender'].values():
-                        for data_ in name_.values():
-                            try:
-                                total += len(data_.values())
-                            except Exception as error_:
-                                await bot.error_msg("chodeling_leaderboard", "Error building fight defender dictionary", error_)
-                                continue
-                    dict_[chodeling['name']] = total
-                await show_leaderboard("Fight", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                while True:
+                    cls()
+                    print(await top_bar("Fight Leaderboard Options"))
+                    user_input = input("Enter 1 For Aggressor Leaderboard\n"
+                                       "Enter 2 For Defender Leaderboard\n"
+                                       "Enter 3 For Total Leaderboard\n"
+                                       "Enter 0 To Go Back\n")
+                    if user_input.isdigit():
+                        dict_ = {}
+                        chodelings_collection = mongo_db.twitch.get_collection('users')
+                        chodelings = chodelings_collection.find({})
+                        user_input = int(user_input)
+                        if user_input == 0:
+                            await bot.go_back()
+                            break
+                        elif user_input == 1:
+                            for chodeling in chodelings:
+                                total = 0
+                                for name_ in chodeling['data_games']['fight']['aggressor'].values():
+                                    for data_ in name_.values():
+                                        try:
+                                            total += len(data_.values())
+                                        except Exception as error_:
+                                            await bot.error_msg("chodeling_leaderboard", "Error building fight aggressor dictionary", error_)
+                                            continue
+                                dict_[chodeling['name']] = total
+                            await show_leaderboard("Fight", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                        elif user_input == 2:
+                            for chodeling in chodelings:
+                                total = 0
+                                for name_ in chodeling['data_games']['fight']['defender'].values():
+                                    for data_ in name_.values():
+                                        try:
+                                            total += len(data_.values())
+                                        except Exception as error_:
+                                            await bot.error_msg("chodeling_leaderboard", "Error building fight defender dictionary", error_)
+                                            continue
+                                dict_[chodeling['name']] = total
+                            await show_leaderboard("Fight", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                        elif user_input == 3:
+                            for chodeling in chodelings:
+                                total = 0
+                                for name_ in chodeling['data_games']['fight']['aggressor'].values():
+                                    for data_ in name_.values():
+                                        try:
+                                            total += len(data_.values())
+                                        except Exception as error_:
+                                            await bot.error_msg("chodeling_leaderboard", "Error building fight aggressor dictionary", error_)
+                                            continue
+                                for name_ in chodeling['data_games']['fight']['defender'].values():
+                                    for data_ in name_.values():
+                                        try:
+                                            total += len(data_.values())
+                                        except Exception as error_:
+                                            await bot.error_msg("chodeling_leaderboard", "Error building fight defender dictionary", error_)
+                                            continue
+                                dict_[chodeling['name']] = total
+                            await show_leaderboard("Fight", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                        else:
+                            await bot.invalid_entry(int)
+                    elif user_input in bot.special_commands.values():
+                        await special_command(user_input)
+                    else:
+                        await bot.invalid_entry(str)
             elif user_input == 3:
                 while True:
                     cls()
@@ -806,21 +849,64 @@ async def chodeling_leaderboards():
                     dict_[chodeling['name']] = total
                 await show_leaderboard("Heist", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
             elif user_input == 7:
-                dict_ = {}
-                chodelings_collection = mongo_db.twitch.get_collection('users')
-                chodelings = chodelings_collection.find({})
-                for chodeling in chodelings:
-                    total = 0
-                    for name_ in chodeling['data_games']['jail']['history'].values():
-                        for data_type in name_.values():
-                            for data_ in data_type.values():
-                                try:
-                                    total += data_
-                                except Exception as error_:
-                                    await bot.error_msg("chodeling_leaderboard", "Error building jail dictionary", error_)
-                                    continue
-                    dict_[chodeling['name']] = total
-                await show_leaderboard("Jail", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                while True:
+                    cls()
+                    print(await top_bar("Jail Leaderboard Options"))
+                    user_input = input("Enter 1 For Aggressor Leaderboard\n"
+                                       "Enter 2 For Defender Leaderboard\n"
+                                       "Enter 3 For Total Leaderboard\n"
+                                       "Enter 0 To Go Back\n")
+                    if user_input.isdigit():
+                        dict_ = {}
+                        chodelings_collection = mongo_db.twitch.get_collection('users')
+                        chodelings = chodelings_collection.find({})
+                        user_input = int(user_input)
+                        if user_input == 0:
+                            await bot.go_back()
+                            break
+                        elif user_input == 1:
+                            for chodeling in chodelings:
+                                total = 0
+                                for name_ in chodeling['data_games']['jail']['history'].values():
+                                    for data_ in name_['aggressor'].values():
+                                        try:
+                                            total += data_
+                                        except Exception as error_:
+                                            await bot.error_msg("chodeling_leaderboard", "Error building jail aggressor dictionary", error_)
+                                            continue
+                                dict_[chodeling['name']] = total
+                            await show_leaderboard("Jail", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                        elif user_input == 2:
+                            for chodeling in chodelings:
+                                total = 0
+                                for name_ in chodeling['data_games']['jail']['history'].values():
+                                    for data_ in name_['defender'].values():
+                                        try:
+                                            total += data_
+                                        except Exception as error_:
+                                            await bot.error_msg("chodeling_leaderboard", "Error building jail defender dictionary", error_)
+                                            continue
+                                dict_[chodeling['name']] = total
+                            await show_leaderboard("Jail", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                        elif user_input == 3:
+                            for chodeling in chodelings:
+                                total = 0
+                                for name_ in chodeling['data_games']['jail']['history'].values():
+                                    for data_type in name_.values():
+                                        for data_ in data_type.values():
+                                            try:
+                                                total += data_
+                                            except Exception as error_:
+                                                await bot.error_msg("chodeling_leaderboard", "Error building jail total dictionary", error_)
+                                                continue
+                                dict_[chodeling['name']] = total
+                            await show_leaderboard("Jail", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                        else:
+                            await bot.invalid_entry(int)
+                    elif user_input in bot.special_commands.values():
+                        await special_command(user_input)
+                    else:
+                        await bot.invalid_entry(str)
             elif user_input == 8:
                 while True:
                     cls()
