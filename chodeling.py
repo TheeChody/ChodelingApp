@@ -1225,10 +1225,14 @@ async def display_stats_bingo():
     async def call_action(action_to_call: str):
         channel_document = await refresh_document_channel()
         if channel_document['data_games']['bingo']['current_game']['game_type'] is not None:
-            if channel_document['data_games']['bingo']['current_game']['items'][action_to_call]:
-                status, reason, error = False, "Is Already Called", False
-            else:
-                status, reason, error = await send_chat_msg(f"!bingo action {action_to_call}")
+            try:
+                if channel_document['data_games']['bingo']['current_game']['items'][action_to_call]:
+                    status, reason, error = False, "Is Already Called", False
+                else:
+                    status, reason, error = await send_chat_msg(f"!bingo action {action_to_call}")
+            except Exception as error_calling_action:
+                await print_status(False, str(error_calling_action), True)
+                return
         else:
             status, reason, error = False, "Game Over/Not Running", False
         await print_status(status, reason, error)
@@ -1464,7 +1468,7 @@ async def display_stats_bingo():
                     elif user_input in bot.special_commands.values():
                         await special_command(user_input)
                     elif bingo_perm or game_admin and user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
-                        await call_action(user_input.lower())
+                        await call_action(title(user_input))
                     else:
                         await bot.invalid_entry(str)
             elif user_input == 3:
@@ -1693,7 +1697,7 @@ async def display_stats_bingo():
                         elif user_input in bot.special_commands.values():
                             await special_command(user_input)
                         elif user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
-                            await call_action(user_input.lower())
+                            await call_action(title(user_input))
                         else:
                             await bot.invalid_entry(str)
             else:
