@@ -236,6 +236,9 @@ class BotSetup(Twitch):
             "bingo": {
                 "carnage_deamon": "659640208",
                 "Free2Escape": "777768639"
+            },
+            "game_admin": {
+                "TheeChodebot": "1023291886"
             }
         }
         self.target_scopes = [
@@ -266,6 +269,8 @@ class BotSetup(Twitch):
     async def check_permissions(user_id: str, perm_check: str) -> bool:
         try:
             if user_id == bot.login_details['target_id']:
+                return True
+            elif perm_check == "game_admin" and user_id in bot.special_users['game_admin'].values():
                 return True
             elif perm_check == "mod" and user_id in bot.variables_channel['mods']:
                 return True
@@ -309,6 +314,8 @@ class BotSetup(Twitch):
 
     @staticmethod
     async def msg_no_perm():
+        cls()
+        print(await top_bar("Permission Error"))
         input("Required Permissions Not Satisfied!!\n"
               "Hit Enter to go back")
         await bot.go_back()
@@ -562,42 +569,42 @@ def check_numbered_list(list_check: list) -> list:
 
 async def chodeling_commands():
     async def show_command_category(command_key: str):
-        while True:
-            cls()
-            user_document = await refresh_document_user()
-            if command_key in ("mods", "unlisted") and not await bot.check_permissions(user_document['_id'], "owner"):
-                await bot.msg_no_perm()
-                break
-            options = []
-            print(await top_bar(f"{command_key.title()} Commands"))
-            try:
-                for n, cmd in enumerate(sorted(bot.commands_available[command_key], key=lambda x: x), start=1):
-                    options.append(f"{n}. {cmd}")
-            except Exception as error_printing_command:
-                await bot.error_msg("chodeling_commands", f"show_command '{command_key}'", error_printing_command)
-            user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
-                               f"{bot.long_dashes()}\n"
-                               f"{f'Enter # Or Type Command To View{nl}' if len(options) > 0 else ''}"
-                               f"Enter 0 To Go Back\n")
-            if user_input == "":
-                await bot.invalid_entry(str)
-            elif user_input.isdigit():
-                user_input = int(user_input)
-                if user_input == 0:
-                    await bot.go_back()
-                    break
-                elif user_input <= len(options):
-                    print(f"VALID -- You chose {remove_period_area(options[user_input - 1])}")
+        user_document = await refresh_document_user()
+        if command_key in ("mods", "unlisted") and not await bot.check_permissions(user_document['_id'], "owner"):
+            await bot.msg_no_perm()
+        else:
+            while True:
+                cls()
+                options = []
+                print(await top_bar(f"{command_key.title()} Commands"))
+                try:
+                    for n, cmd in enumerate(sorted(bot.commands_available[command_key], key=lambda x: x), start=1):
+                        options.append(f"{n}. {cmd}")
+                except Exception as error_printing_command:
+                    await bot.error_msg("chodeling_commands", f"show_command '{command_key}'", error_printing_command)
+                user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
+                                   f"{bot.long_dashes()}\n"
+                                   f"{f'Enter # Or Type Command To View{nl}' if len(options) > 0 else ''}"
+                                   f"Enter 0 To Go Back\n")
+                if user_input == "":
+                    await bot.invalid_entry(str)
+                elif user_input.isdigit():
+                    user_input = int(user_input)
+                    if user_input == 0:
+                        await bot.go_back()
+                        break
+                    elif user_input <= len(options):
+                        print(f"VALID -- You chose {remove_period_area(options[user_input - 1])}")
+                        await asyncio.sleep(2)
+                    else:
+                        await bot.invalid_entry(int)
+                elif user_input in bot.special_commands.values():
+                    await special_command(user_input)
+                elif user_input.lower() in check_numbered_list(options):
+                    print(f"VALID -- You chose {user_input.lower()}")
                     await asyncio.sleep(2)
                 else:
-                    await bot.invalid_entry(int)
-            elif user_input in bot.special_commands.values():
-                await special_command(user_input)
-            elif user_input.lower() in check_numbered_list(options):
-                print(f"VALID -- You chose {user_input.lower()}")
-                await asyncio.sleep(2)
-            else:
-                await bot.invalid_entry(str)
+                    await bot.invalid_entry(str)
 
     while True:
         cls()
@@ -1215,18 +1222,59 @@ async def display_stats_bingo():
             await bot.error_msg("display_stats_bingo", "Building Board", error_building_board)
         return chodeling_board
 
-    async def check_bingo_game_status() -> bool:
+    async def call_action(action_to_call: str):
+        channel_document = await refresh_document_channel()
+        if channel_document['data_games']['bingo']['current_game']['game_type'] is not None:
+            if channel_document['data_games']['bingo']['current_game']['items'][action_to_call]:
+                status, reason, error = False, "Is Already Called", False
+            else:
+                status, reason, error = await send_chat_msg(f"!bingo action {action_to_call}")
+        else:
+            status, reason, error = False, "Game Over/Not Running", False
+        await print_status(status, reason, error)
+
+    async def check_bingo_game_status(admin_check: bool = False) -> bool:
         user_document = await refresh_document_user()
         channel_document = await refresh_document_channel()
-        if None in (user_document['data_games']['bingo']['current_game']['game_type'], channel_document['data_games']['bingo']['current_game']['game_type']):
-            cmd = "'!bingo join'"
-            game_type = channel_document['data_games']['bingo']['current_game']['game_type']
-            if game_type is not None:
-                game_type = game_type.replace('_', ' ').title()
-            input(f"{'No Bingo Game Running' if game_type is None else f'There is a {game_type} running{nl}Use {cmd} to join'}\n"
-                  "Hit Enter To Go Back")
-            await bot.go_back()
-            return False
+        if admin_check:
+            if channel_document['data_games']['bingo']['current_game']['game_type'] is None:
+                while True:
+                    options = []
+                    for n, game_type in enumerate(channel_document['data_games']['bingo']['modes'].keys(), start=1):
+                        options.append(f"{n}. {game_type}")
+                    user_input = input("No Game Running!\n"
+                                       "Enter # Or Type Game Type To Start\n"
+                                       "Enter 0/Nothing To Go Back\n")
+                    if user_input == "":
+                        await bot.go_back()
+                        return False
+                    elif user_input.isdigit():
+                        user_input = int(user_input)
+                        if user_input == 0:
+                            await bot.go_back()
+                            return False
+                        elif user_input <= len(options):
+                            status, reason, error = await send_chat_msg(f"!bingo start {remove_period_area(options[user_input - 1])}")
+                            await print_status(status, reason, error)
+                            return status
+                        else:
+                            await bot.invalid_entry(int)
+                    elif user_input in check_numbered_list(options):
+                        status, reason, error = await send_chat_msg(f"!bingo start {user_input}")
+                        await print_status(status, reason, error)
+                        return status
+                    else:
+                        await bot.invalid_entry(str)
+        else:
+            if None in (user_document['data_games']['bingo']['current_game']['game_type'], channel_document['data_games']['bingo']['current_game']['game_type']):
+                cmd = "'!bingo join'"
+                game_type = channel_document['data_games']['bingo']['current_game']['game_type']
+                if game_type is not None:
+                    game_type = game_type.replace('_', ' ').title()
+                input(f"{'No Bingo Game Running' if game_type is None else f'There is a {game_type} running{nl}Use {cmd} to join'}\n"
+                      "Hit Enter To Go Back")
+                await bot.go_back()
+                return False
         return True
 
     def index_bingo(item: str, item_list: list) -> int:
@@ -1290,18 +1338,24 @@ async def display_stats_bingo():
             await bot.error_msg("display_stats_bingo", "Error Refreshing user_stats", error_refreshing_stats)
         return user_stats
 
+    game_admin = await bot.check_permissions(user.id, "game_admin")
     while True:
+        # ToDo; Add 'game runner' option for myself to exclude myself from future games but allow for calling/displaying board on stream
         cls()
         options = []
         user_document = await refresh_document_user()
         channel_document = await refresh_document_channel()
         print(await top_bar("Bingo Options"))
         try:
-            if None not in (user_document['data_games']['bingo']['current_game']['game_type'], channel_document['data_games']['bingo']['current_game']['game_type']):
-                options = ["Enter 1 To View Game Info", "Enter 2 To View Your Board"]
+            if game_admin or None not in (user_document['data_games']['bingo']['current_game']['game_type'], channel_document['data_games']['bingo']['current_game']['game_type']):
+                options.append("Enter 1 To View Game Info")
+                if user_document['data_games']['bingo']['current_game']['game_type'] is not None:
+                    options.append("Enter 2 To View Your Board")
             options.append("Enter 3 To View History")
             if channel_document['data_games']['bingo']['current_game']['game_type'] is not None and user_document['data_games']['bingo']['current_game']['game_type'] is None:
                 options.append("Enter 4 To Join Bingo Game")
+            if game_admin:
+                options.append("Enter 5 To Admin Bingo Game")
         except Exception as error_building_options:
             await bot.error_msg("display_stats_bingo", "Error Building Options", error_building_options)
         user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
@@ -1327,7 +1381,7 @@ async def display_stats_bingo():
 
                 while True:
                     cls()
-                    if not await check_bingo_game_status():
+                    if not await check_bingo_game_status(True if game_admin else False):
                         break
                     options = []
                     channel_document = await refresh_document_channel()
@@ -1378,24 +1432,13 @@ async def display_stats_bingo():
                     else:
                         await bot.invalid_entry(str)
             elif user_input == 2:
-                async def call_action(action_to_call: str):
-                    channel_document = await refresh_document_channel()
-                    if channel_document['data_games']['bingo']['current_game']['game_type'] is not None:
-                        if channel_document['data_games']['bingo']['current_game']['items'][action_to_call]:
-                            status, reason, error = False, "Is Already Called", False
-                        else:
-                            status, reason, error = await send_chat_msg(f"!bingo action {action_to_call}")
-                    else:
-                        status, reason, error = False, "Game Over/Not Running", False
-                    await print_status(status, reason, error)
-
+                bingo_perm = await bot.check_permissions(user.id, "mini_game_bingo")
                 while True:
                     cls()
                     if not await check_bingo_game_status():
                         break
                     user_document = await refresh_document_user()
                     channel_document = await refresh_document_channel()
-                    bingo_perm = await bot.check_permissions(user.id, "mini_game_bingo")
                     print(await top_bar(f"{channel_document['data_games']['bingo']['current_game']['game_type'].title()} Items Available"))
                     await print_items(channel_document['data_games']['bingo']['current_game']['items'])
                     chodeling_board = await build_board(user_document['data_games']['bingo']['current_game']['game_board'],
@@ -1404,7 +1447,7 @@ async def display_stats_bingo():
                     if len(chodeling_board) > 0:
                         await print_board(chodeling_board)
                     user_input = input(f"{bot.long_dashes()}\n"
-                                       f"{f'Enter # Or Type Out Item To Call{nl}' if bingo_perm else ''}"
+                                       f"{f'Enter # Or Type Out Item To Call{nl}' if bingo_perm or game_admin else ''}"
                                        f"Enter 0 To Go Back\n"
                                        f"Enter Nothing To Refresh\n")
                     if user_input == "":
@@ -1414,13 +1457,13 @@ async def display_stats_bingo():
                         if user_input == 0:
                             await bot.go_back()
                             break
-                        elif bingo_perm and user_input <= len(channel_document['data_games']['bingo']['current_game']['items']):
+                        elif bingo_perm or game_admin and user_input <= len(channel_document['data_games']['bingo']['current_game']['items']):
                             await call_action(list(channel_document['data_games']['bingo']['current_game']['items'].keys())[user_input - 1])
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
                         await special_command(user_input)
-                    elif bingo_perm and user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
+                    elif bingo_perm or game_admin and user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
                         await call_action(user_input.lower())
                     else:
                         await bot.invalid_entry(str)
@@ -1621,6 +1664,38 @@ async def display_stats_bingo():
                 else:
                     status, reason, error = await send_chat_msg("!bingo join")
                     await print_status(status, reason, error)
+            elif user_input == 5:
+                if not game_admin:
+                    await bot.msg_no_perm()
+                else:
+                    while True:
+                        cls()
+                        if not await check_bingo_game_status(True):
+                            break
+                        channel_document = await refresh_document_channel()
+                        print(await top_bar(f"{channel_document['data_games']['bingo']['current_game']['game_type'].title()} Items Available"))
+                        await print_items(channel_document['data_games']['bingo']['current_game']['items'])
+                        user_input = input(f"{bot.long_dashes()}\n"
+                                           f"Enter # Or Type Out Item To Call\n"
+                                           f"Enter 0 To Go Back\n"
+                                           f"Enter Nothing To Refresh\n")
+                        if user_input == "":
+                            pass
+                        elif user_input.isdigit():
+                            user_input = int(user_input)
+                            if user_input == 0:
+                                await bot.go_back()
+                                break
+                            elif user_input <= len(channel_document['data_games']['bingo']['current_game']['items']):
+                                await call_action(list(channel_document['data_games']['bingo']['current_game']['items'].keys())[user_input - 1])
+                            else:
+                                await bot.invalid_entry(int)
+                        elif user_input in bot.special_commands.values():
+                            await special_command(user_input)
+                        elif user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
+                            await call_action(user_input.lower())
+                        else:
+                            await bot.invalid_entry(str)
             else:
                 await bot.invalid_entry(int)
         elif user_input in bot.special_commands.values():
@@ -2432,6 +2507,43 @@ async def display_stats_heist():
 
 async def display_stats_jail():
     await bot.not_programmed()
+    # async def refresh_global_stats():
+    #     user_stats = {
+    #         "early_release": 0,
+    #         "escape_card_uses": 0,
+    #         "fish_jails": 0,
+    #         "shield_times": 0,
+    #         "total": 0,
+    #         "total_aggressor": 0,
+    #         "total_defender": 0,
+    #     }
+    #
+    #     return user_stats
+    #
+    # while True:
+    #     cls()
+    #     print(await top_bar("Jail Stats"))
+    #     user_input = input("Enter 1 To View Detailed Aggressor Stats\n"
+    #                        "Enter 2 To View Detailed Defender Stats\n"
+    #                        "Enter 0 To Go Back\n"
+    #                        "Enter Nothing To Refresh\n")
+    #     if user_input == "":
+    #         pass
+    #     elif user_input.isdigit():
+    #         user_input = int(user_input)
+    #         if user_input == 0:
+    #             await bot.go_back()
+    #             break
+    #         elif user_input == 1:
+    #             await bot.not_programmed()
+    #         elif user_input == 2:
+    #             await bot.not_programmed()
+    #         else:
+    #             await bot.invalid_entry(int)
+    #     elif user_input in bot.special_commands.values():
+    #         await special_command(user_input)
+    #     else:
+    #         await bot.invalid_entry(str)
 
 
 async def display_stats_other():
