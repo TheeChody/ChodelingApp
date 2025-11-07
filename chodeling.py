@@ -20,6 +20,7 @@ from mongoengine import connect, disconnect_all, DEFAULT_CONNECTION_NAME, Docume
 
 # ToDo; Add 'upsidedown text to everything' easter egg
 # ToDo; Add stats for time added (also rework chodebot & user documents to keep track & write script to scrape past logs to build data)
+# ToDo; Add ability to redeem free packs from app anywhere using special commands
 
 if getattr(sys, 'frozen', False):
     application_path = f"{os.path.dirname(sys.executable)}\\_internal"
@@ -43,7 +44,6 @@ db_string = os.getenv("db_string")
 
 nl = "\n"
 logger_list = []
-# long_dashes = "-" * 100
 
 
 class BotSetup(Twitch):
@@ -328,7 +328,7 @@ async def app_settings():
         return False
 
     async def write_var(key_write: str, var_write: str):
-        with open(bot.data_settings[key_write], "w") as file:
+        with open(bot.data_settings[key_write], "w", encoding="utf-8") as file:
             file.write(var_write)
         if key_write not in ("line_dash", "window_length"):
             bot.variables[key_write] = var_write
@@ -1380,10 +1380,13 @@ async def display_stats_bingo():
             elif user_input == 2:
                 async def call_action(action_to_call: str):
                     channel_document = await refresh_document_channel()
-                    if channel_document['data_games']['bingo']['current_game']['items'][action_to_call]:
-                        status, reason, error = False, "Is Already Called", False
+                    if channel_document['data_games']['bingo']['current_game']['game_type'] is not None:
+                        if channel_document['data_games']['bingo']['current_game']['items'][action_to_call]:
+                            status, reason, error = False, "Is Already Called", False
+                        else:
+                            status, reason, error = await send_chat_msg(f"!bingo action {action_to_call}")
                     else:
-                        status, reason, error = await send_chat_msg(f"!bingo action {action_to_call}")
+                        status, reason, error = False, "Game Over/Not Running", False
                     await print_status(status, reason, error)
 
                 while True:
@@ -2977,7 +2980,7 @@ async def get_auth_user_id() -> TwitchUser | None:
 
 def data_check():
     def write_new_file(filename: str, var_write: str):
-        with open(filename, "w") as file:
+        with open(filename, "w", encoding="utf-8") as file:
             file.write(var_write)
         logger.info(f"{fortime()}: '{filename}'\nFile NOT FOUND, CREATED!")
         time.sleep(5)
