@@ -268,9 +268,9 @@ class BotSetup(Twitch):
         return f"{self.line_dash * self.length}"
 
     async def check_permissions(self, user_id: str, perm_check: str) -> bool:
-        bingo_mods = tuple(self.special_users['bingo'].values())
-        channel_mods = tuple(self.variables_channel['mods'])
-        game_admins = tuple(self.special_users['game_admin'].values())
+        bingo_mods = list(self.special_users['bingo'].values())
+        channel_mods = self.variables_channel['mods']
+        game_admins = list(self.special_users['game_admin'].values())
         try:
             if user_id == self.login_details['target_id']:
                 return True
@@ -1499,7 +1499,7 @@ async def display_stats_bingo():
                     if len(chodeling_board) > 0:
                         await print_board(chodeling_board)
                     user_input = input(f"{bot.long_dashes()}\n"
-                                       f"{f'Enter # Or Type Out Item To Call{nl}' if bingo_perm else ''}"
+                                       f"{f'Enter # Or Type Out Item To Call{nl}' if bingo_perm or game_admin else ''}"
                                        f"Enter 0 To Go Back\n"
                                        f"Enter Nothing To Refresh\n")
                     if user_input == "":
@@ -1509,13 +1509,13 @@ async def display_stats_bingo():
                         if user_input == 0:
                             await bot.go_back()
                             break
-                        elif bingo_perm and user_input <= len(channel_document['data_games']['bingo']['current_game']['items']):
+                        elif bingo_perm or game_admin and user_input <= len(channel_document['data_games']['bingo']['current_game']['items']):
                             await call_action(list(channel_document['data_games']['bingo']['current_game']['items'].keys())[user_input - 1])
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
                         await special_command(user_input)
-                    elif bingo_perm and user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
+                    elif bingo_perm or game_admin and user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
                         await call_action(title(user_input))
                     else:
                         await bot.invalid_entry(str)
@@ -3198,7 +3198,7 @@ def data_check():
 def hotkey_listen():
     clear_code = '\033'
     try:
-        keyboard.add_hotkey("ctrl+shift+b", lambda: keyboard.write(f"{clear_code}{bot.special_commands['bet']}\r"))
+        keyboard.add_hotkey("ctrl+shift+b", lambda: keyboard.write(f"{clear_code}{bot.special_commands['bet']}\r"), timeout=0)
         keyboard.add_hotkey("ctrl+shift+c", lambda: keyboard.write(f"{clear_code}{bot.special_commands['free_pack']}\r"))
         keyboard.add_hotkey("ctrl+shift+d+b", lambda: keyboard.write(f"{clear_code}{bot.special_commands['bbet']}\r"))
         keyboard.add_hotkey("ctrl+shift+f", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish']}\r"))
