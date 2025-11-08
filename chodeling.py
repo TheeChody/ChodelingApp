@@ -3,6 +3,7 @@ import re
 import sys
 import math
 import time
+import json
 import asyncio
 import logging
 import datetime
@@ -10,7 +11,6 @@ import keyboard
 import threading
 from pathlib import Path
 from decimal import Decimal
-from dotenv import load_dotenv
 from colorama import Fore, Style
 from twitchAPI.twitch import Twitch, TwitchUser
 from twitchAPI.oauth import UserAuthenticationStorageHelper
@@ -20,27 +20,24 @@ from mongoengine import connect, disconnect_all, DEFAULT_CONNECTION_NAME, Docume
 
 # ToDo; Add 'upsidedown text to everything' easter egg
 # ToDo; Add stats for time added (also rework chodebot & user documents to keep track & write script to scrape past logs to build data)
-# ToDo; Add ability to redeem free packs from app anywhere using special commands
 
 if getattr(sys, 'frozen', False):
-    application_path = f"{os.path.dirname(sys.executable)}\\_internal"
+    application_path = f"{os.path.dirname(sys.executable)}\\_internal\\"
 else:
-    application_path = os.path.dirname(__file__)
+    application_path = f"{os.path.dirname(__file__)}\\"
 
 directories = {
-    "data": f"{application_path}\\data\\",
-    "logs": f"{application_path}\\logs\\",
-    "logs_archive": f"{application_path}\\logs\\archive_log\\"
+    "auth": f"{application_path}auth\\",
+    "data": f"{application_path}data\\",
+    "logs": f"{application_path}logs\\",
+    "logs_archive": f"{application_path}logs\\archive_log\\"
 }
 
+auth_json = f"{directories['auth']}auth_info.json"
+Path(directories['auth']).mkdir(parents=True, exist_ok=True)
 Path(directories['data']).mkdir(parents=True, exist_ok=True)
 Path(directories['logs']).mkdir(parents=True, exist_ok=True)
 Path(directories['logs_archive']).mkdir(parents=True, exist_ok=True)
-
-load_dotenv()
-bot_id = os.getenv("bot_id")
-bot_secret = os.getenv("bot_secret")
-db_string = os.getenv("db_string")
 
 nl = "\n"
 logger_list = []
@@ -1220,7 +1217,7 @@ def colour(colour_: str, str_: str) -> str:
     return f"{colour_}{str_}{Fore.RESET}"
 
 
-def connect_mongo(db, alias):
+def connect_mongo(db, db_string, alias):
     try:
         client = connect(db=db, host=db_string, alias=alias)
         logger.info(f"{fortime()}: MongoDB Connected\n{bot.long_dashes()}")
@@ -1287,6 +1284,7 @@ async def display_stats_bingo():
         if admin_check:
             if channel_document['data_games']['bingo']['current_game']['game_type'] is None:
                 while True:
+                    cls()
                     options = []
                     length = get_length(channel_document['data_games']['bingo']['modes'].keys())
                     for n, game_type in enumerate(channel_document['data_games']['bingo']['modes'].keys(), start=1):
@@ -1323,6 +1321,7 @@ async def display_stats_bingo():
                 game_type = channel_document['data_games']['bingo']['current_game']['game_type']
                 if game_type is not None:
                     game_type = game_type.replace('_', ' ').title()
+                print(await top_bar("You're Not In A Bingo Game"))
                 input(f"{'No Bingo Game Running' if game_type is None else f'There is a {game_type} running{nl}Use {cmd} to join'}\n"
                       "Hit Enter To Go Back")
                 await bot.go_back()
@@ -2821,7 +2820,7 @@ def numberize(n: float, decimals: int = 2) -> str:
         return is_negative_string + str(n)
 
 
-def read_file(file_name: str, return_type: type(bool) | type(float) | type(int) | type(list) | type(str)) -> bool | float | int | list | str:
+def read_file(file_name: str, return_type: type(bool) | type(dict) | type(float) | type(int) | type(list) | type(str)) -> bool | dict | float | int | list | str:
     with open(file_name, "r", encoding="utf-8") as file:
         variable = file.read()
     try:
@@ -2832,6 +2831,12 @@ def read_file(file_name: str, return_type: type(bool) | type(float) | type(int) 
                 return False
             else:
                 return f"ValueError Converting {variable} to {return_type}"
+        elif type(return_type) == dict:
+            if return_type['json']:
+                with open(file_name, "r", encoding="utf-8") as file:
+                    return json.load(file)
+            else:
+                return dict(variable)
         elif type(return_type) == list:
             if return_type[1] == "split":
                 variable = variable.split(return_type[2], maxsplit=return_type[3])
@@ -3159,21 +3164,6 @@ async def auth_bot() -> UserAuthenticationStorageHelper:
     return twitch_helper
 
 
-async def get_auth_user_id() -> TwitchUser | None:
-    user = None
-    user_info = bot.get_users()
-    try:
-        async for entry in user_info:
-            if type(entry) == TwitchUser:
-                user = entry
-            else:
-                await bot.error_msg("get_auth_user_id", "Generic Error", "NO USER FOUND IN 'user_info'")
-    except Exception as e:
-        await bot.error_msg("get_auth_user_id", "Generic Error", e)
-        return None
-    return user
-
-
 def data_check():
     def write_new_file(filename: str, var_write: str):
         with open(filename, "w", encoding="utf-8") as file:
@@ -3195,6 +3185,29 @@ def data_check():
                 write_new_file(path, str(bot.settings[setting][0]))
 
 
+def fetch_stock_auth() -> dict:
+    return {
+        "bot_id": None,
+        "secret_id": None,
+        "db_string": read_file(f"{directories['auth']}chodeling_string.txt", str)
+    }
+
+
+async def get_auth_user_id() -> TwitchUser | None:
+    user = None
+    user_info = bot.get_users()
+    try:
+        async for entry in user_info:
+            if type(entry) == TwitchUser:
+                user = entry
+            else:
+                await bot.error_msg("get_auth_user_id", "Generic Error", "NO USER FOUND IN 'user_info'")
+    except Exception as e:
+        await bot.error_msg("get_auth_user_id", "Generic Error", e)
+        return None
+    return user
+
+
 def hotkey_listen():
     clear_code = '\033'
     try:
@@ -3212,6 +3225,37 @@ def hotkey_listen():
         logger.error(f"{fortime()}: Error in 'hotkey_listen' -- {e}")
 
 
+def save_json(dict_: dict, file_save: str, first_create: bool = False):
+    with open(file_save, "w", encoding="utf-8") as file:
+        json.dump(dict_, file, indent=4, ensure_ascii=False)
+    if first_create:
+        logger.info(f"{fortime()}: First Time Run Detected!!\n'{auth_json}' File Created!")
+        time.sleep(5)
+
+
+def update_auth_json(current_dict: dict) -> dict:
+    while True:
+        cls()
+        user_input = input("Enter In Client ID\n")
+        if user_input == "":
+            asyncio.run(bot.invalid_entry(str))
+        else:
+            current_dict['bot_id'] = user_input
+            print(f"Setting '{current_dict['bot_id']}' as thee Client ID")
+            break
+    while True:
+        cls()
+        user_input = input("Enter In Secret ID\n")
+        if user_input == "":
+            asyncio.run(bot.invalid_entry(str))
+        else:
+            current_dict['secret_id'] = user_input
+            print(f"Setting '{current_dict['secret_id']}' as thee Secret ID")
+            break
+    save_json(current_dict, auth_json)
+    return current_dict
+
+
 if __name__ == "__main__":
     init_time = fortime().replace(' ', '--').replace(':', '-')
     logger = setup_logger("logger", f"main_log--{init_time}.log", logger_list)
@@ -3220,7 +3264,12 @@ if __name__ == "__main__":
         print(f"One of thee loggers isn't setup right\n{logger}\nQuitting program")
         time.sleep(5)
     else:
-        bot = BotSetup(bot_id, bot_secret)
+        if not os.path.exists(auth_json):
+            save_json(fetch_stock_auth(), auth_json, True)
+        auth_dict = read_file(auth_json, {"json": True})
+        if None in (auth_dict['bot_id'], auth_dict['secret_id']):
+            auth_dict = update_auth_json(auth_dict)
+        bot = BotSetup(auth_dict['bot_id'], auth_dict['secret_id'])
         data_check()
         bot.set_dashes()
         while True:
@@ -3234,7 +3283,7 @@ if __name__ == "__main__":
                     break
                 elif user_input == 1:
                     cls()
-                    mongo_db = connect_mongo("twitch", DEFAULT_CONNECTION_NAME)
+                    mongo_db = connect_mongo("twitch", auth_dict['db_string'], DEFAULT_CONNECTION_NAME)
                     time.sleep(1)
                     if mongo_db is None:
                         logger.error(f"{fortime()}: Error connecting to DB!! Exiting App")
