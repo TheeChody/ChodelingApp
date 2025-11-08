@@ -278,7 +278,7 @@ class BotSetup(Twitch):
                 return True
             elif perm_check == "mod" and user_id in channel_mods:
                 return True
-            elif perm_check == "mini_game_bingo" and user_id in (bingo_mods, channel_mods, game_admins):
+            elif perm_check == "mini_game_bingo" and user_id in list(bingo_mods + channel_mods + game_admins):
                 return True
             return False
         except Exception as error_permission_check:
@@ -1388,9 +1388,9 @@ async def display_stats_bingo():
             await bot.error_msg("display_stats_bingo", "Error Refreshing user_stats", error_refreshing_stats)
         return user_stats
 
+    bingo_perm = await bot.check_permissions(user.id, "mini_game_bingo")
     game_admin = await bot.check_permissions(user.id, "game_admin")
     while True:
-        # ToDo; Add 'game runner' option for myself to exclude myself from future games but allow for calling/displaying board on stream
         cls()
         options = []
         user_document = await refresh_document_user()
@@ -1484,7 +1484,7 @@ async def display_stats_bingo():
                     else:
                         await bot.invalid_entry(str)
             elif user_input == 2:
-                bingo_perm = await bot.check_permissions(user.id, "mini_game_bingo")
+
                 while True:
                     cls()
                     if not await check_bingo_game_status():
@@ -1499,7 +1499,7 @@ async def display_stats_bingo():
                     if len(chodeling_board) > 0:
                         await print_board(chodeling_board)
                     user_input = input(f"{bot.long_dashes()}\n"
-                                       f"{f'Enter # Or Type Out Item To Call{nl}' if bingo_perm or game_admin else ''}"
+                                       f"{f'Enter # Or Type Out Item To Call{nl}' if bingo_perm else ''}"
                                        f"Enter 0 To Go Back\n"
                                        f"Enter Nothing To Refresh\n")
                     if user_input == "":
@@ -1509,13 +1509,13 @@ async def display_stats_bingo():
                         if user_input == 0:
                             await bot.go_back()
                             break
-                        elif bingo_perm or game_admin and user_input <= len(channel_document['data_games']['bingo']['current_game']['items']):
+                        elif bingo_perm and user_input <= len(channel_document['data_games']['bingo']['current_game']['items']):
                             await call_action(list(channel_document['data_games']['bingo']['current_game']['items'].keys())[user_input - 1])
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
                         await special_command(user_input)
-                    elif bingo_perm or game_admin and user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
+                    elif bingo_perm and user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
                         await call_action(title(user_input))
                     else:
                         await bot.invalid_entry(str)
@@ -1720,13 +1720,14 @@ async def display_stats_bingo():
                     status, reason, error = await send_chat_msg("!bingo join")
                     await print_status(status, reason, error)
             elif user_input == 5:
+                # ToDo; Add ability to end game from admin area & in-game area if game_admin
                 if not game_admin:
                     await bot.msg_no_perm()
                 else:
                     while True:
-                        cls()
                         if not await check_bingo_game_status(True):
                             break
+                        cls()
                         channel_document = await refresh_document_channel()
                         print(await top_bar(f"{channel_document['data_games']['bingo']['current_game']['game_type'].title()} Items Available"))
                         await print_items(channel_document['data_games']['bingo']['current_game']['items'])
