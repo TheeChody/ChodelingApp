@@ -43,4 +43,4 @@ Then Run;
 
 py chodelingapp.py
 
-Fill out required info (client_id & secret_id) and good to go
+Fill out required info (client_id & secret_id) and good to go (assuming you've talked to me and gotten the auth file needed to boot properly!!)
