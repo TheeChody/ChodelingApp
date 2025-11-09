@@ -8,6 +8,7 @@ Go To; [Twitch Dev Console](https://dev.twitch.tv/console/apps)
 Click Register Your App
 
 Name it whatever you want, select chat bot as app type and use ; 'http://localhost:17563' (without ', and no trailing /) as the OAuth Redirect URL
+Select Chat Bot as category and confidential for client type
 
 <img width="183" height="321" alt="image" src="https://github.com/user-attachments/assets/b75c966d-3e0b-4c91-a84d-fa863576b01a" />
 
