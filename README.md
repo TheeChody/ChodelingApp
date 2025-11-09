@@ -1,4 +1,4 @@
-# ChodelingApp
+ # ChodelingApp
 
 ______________________________________________________________
 Twitch Dev App Setup; (Needed either way)
@@ -45,11 +45,13 @@ Run Following Command To Install Dependant Libaries;
 
 pip install -r requirements.txt
 
+See discord channel 'chodeling-app' pinned comment for auth file needed to launch app
+
 Then Run;
 
 py chodelingapp.py
 
-Fill out required info (client_id & secret_id) and good to go (See discord channel 'chodeling-app' pinned comment for auth file needed to launch app)
+Fill out required info (client_id & secret_id) and good to go
 
 ______________________________________________________________
 .Exe Install; (Only for running the .exe file, if using python skip)
