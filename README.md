@@ -24,8 +24,11 @@ ______________________________________________________________
 Run through the install process;
 ______________________________________________________________
 Make Sure To Add To PATH!
+
 <img width="655" height="400" alt="Screenshot 2025-11-08 161613" src="https://github.com/user-attachments/assets/994e3a20-fb06-45c0-8da5-9c9028e8a54e" />
+
 Not required but might as well;
+
 <img width="656" height="403" alt="Screenshot 2025-11-08 162635" src="https://github.com/user-attachments/assets/23dae50b-860d-4187-b281-46432044d1ab" />
 
 RESTART PC/LAPTOP
