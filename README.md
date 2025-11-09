@@ -33,6 +33,12 @@ Not required but might as well;
 
 RESTART PC/LAPTOP
 
+Come back here, download zip folder
+
+<img width="515" height="436" alt="image" src="https://github.com/user-attachments/assets/76b25737-1c62-474c-bc06-827896660e9a" />
+
+Extract where you want, then;
+
 Open CMD, Navigate to python script path ( cd DRIVE_LETTER:/PATH/TO/FILE )
 
 Run Following Command To Install Dependant Libaries;
