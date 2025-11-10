@@ -60,9 +60,10 @@ ______________________________________________________________
 
 Download latest release 
 
-<img width="1262" height="659" alt="image" src="https://github.com/user-attachments/assets/41c34c46-4f92-4296-992a-ceec84480539" />
-<img width="1313" height="1037" alt="image" src="https://github.com/user-attachments/assets/fbb172c6-34de-49de-b063-c4f0065910e1" />
+<img width="1549" height="792" alt="image" src="https://github.com/user-attachments/assets/12083bff-070e-47d2-ae53-7ff21d82ad53" />
+
+<img width="1563" height="802" alt="image" src="https://github.com/user-attachments/assets/6ab0e26e-3ab1-47ad-89c0-dcb2b2ea5551" />
 
 See discord channel 'chodeling-app' pinned comment for auth file needed to launch app
 
-Unzip where you want, and after copying over auth file, run Thee Chodeling App.exe and enter in the client_id and client_secret and good to go
+Unzip where you want, and after copying over auth to documents, run Thee Chodeling App.exe and enter in the client_id and client_secret when prompted and you good to go
