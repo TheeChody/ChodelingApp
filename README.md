@@ -1,5 +1,11 @@
  # ChodelingApp
 
+ ## 2 Options To Run 
+ 
+ ### 1) Python Script
+
+ ### 2) EXE File
+
 ______________________________________________________________
 Twitch Dev App Setup; (Needed either way)
 ______________________________________________________________
