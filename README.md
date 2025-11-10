@@ -18,7 +18,7 @@ Keep note of your client_id and secret_id, save in a notepad, keep to yourself, 
  ## 2 Options To Run 
  
  1) [Python Script](#1-python-install-only-need-to-do-if-using-python-to-run-app-if-using-the-packaged-exe-skip)
- 2) [.exe File](https://github.com/TheeChody/ChodelingApp#2-exe-install-only-for-running-the-exe-file-if-using-python-skip)
+ 2) [.exe File](#2-exe-install-only-for-running-the-exe-file-if-using-python-skip)
 
 ______________________________________________________________
 ### 1) Python Install; (Only need to do if using python to run app, if using the packaged .exe skip)
