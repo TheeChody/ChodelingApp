@@ -22,33 +22,23 @@ from mongoengine import connect, disconnect_all, DEFAULT_CONNECTION_NAME, Docume
 # ToDo; Add stats for time added (also rework chodebot & user documents to keep track & write script to scrape past logs to build data)
 
 if getattr(sys, 'frozen', False):
-    is_exe = True
-    application_path = f"{os.path.dirname(sys.executable)}\\_internal\\"
+    folder_name = "Thee ChodelingApp"
+    if sys.platform == "win32":
+        from ctypes import windll, create_unicode_buffer
+        _personal = 5
+        _type_current = 0
+        buf = create_unicode_buffer(260)
+        if windll.shell32.SHGetFolderPathW(None, _personal, None, _type_current, buf) == 0:
+            application_path = f"{Path(buf.value)}\\{folder_name}\\"
+        else:
+            application_path = f"{Path(os.environ['USERPROFILE']) / 'Documents'}\\{folder_name}\\"
+    else:
+        application_path = f"{Path.home() / 'Documents'}\\{folder_name}\\"
 else:
-    is_exe = False
     application_path = f"{os.path.dirname(__file__)}\\"
 
-
-def get_documents_path():
-    try:
-        if sys.platform == "win32":
-            from ctypes import windll, create_unicode_buffer
-            _personal = 5
-            _type_current = 0
-            buf = create_unicode_buffer(260)
-            if windll.shell32.SHGetFolderPathW(None, _personal, None, _type_current, buf) == 0:
-                return Path(buf.value)
-            else:
-                return Path(os.environ["USERPROFILE"]) / "Documents"
-        else:
-            return Path.home() / "Documents"
-    except Exception as e:
-        print(f"Error getting Documents path: {e}")
-        return None
-
-
 directories = {
-    "auth": f"{get_documents_path()}\\Thee ChodelingApp\\auth\\" if is_exe else f"{application_path}auth\\",
+    "auth": f"{application_path}auth\\",
     "data": f"{application_path}data\\",
     "logs": f"{application_path}logs\\",
     "logs_archive": f"{application_path}logs\\archive_log\\"
