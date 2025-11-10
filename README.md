@@ -1,11 +1,5 @@
  # ChodelingApp
 
- ## 2 Options To Run 
- 
- ### 1) Python Script
-
- ### 2) EXE File
-
 ______________________________________________________________
 Twitch Dev App Setup; (Needed either way)
 ______________________________________________________________
@@ -21,8 +15,13 @@ Select Chat Bot as category and confidential for client type
 
 Keep note of your client_id and secret_id, save in a notepad, keep to yourself, don't share with anyone!
 
+ ## 2 Options To Run 
+ 
+ 1) [Python Script](https://github.com/TheeChody/ChodelingApp/edit/main/README.md#1-python-install-only-need-to-do-if-using-python-to-run-app-if-using-the-packaged-exe-skip)
+ 2) [.exe file](https://github.com/TheeChody/ChodelingApp/edit/main/README.md#2-exe-install-only-for-running-the-exe-file-if-using-python-skip)
+
 ______________________________________________________________
-Python Install; (Only need to do if using python to run app, if using the packaged .exe skip)
+### 1) Python Install; (Only need to do if using python to run app, if using the packaged .exe skip)
 ______________________________________________________________
 
 Go To [Python 3.11.9 Download](https://www.python.org/downloads/release/python-3119/)
@@ -61,7 +60,7 @@ py chodelingapp.py
 Fill out required info (client_id & secret_id) and good to go
 
 ______________________________________________________________
-.Exe Install; (Only for running the .exe file, if using python skip)
+### 2) .Exe Install; (Only for running the .exe file, if using python skip)
 ______________________________________________________________
 
 Download latest release 
