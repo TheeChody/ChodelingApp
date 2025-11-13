@@ -280,7 +280,7 @@ class BotSetup(Twitch):
             await self.msg_error("check_permissions", "Generic Error", error_permission_check)
             return False
 
-    async def data_check(self):
+    def data_check(self):
         def write_new_file(filename: str, var_write: str):
             with open(filename, "w", encoding="utf-8") as file:
                 file.write(var_write)
@@ -301,7 +301,7 @@ class BotSetup(Twitch):
                     else:
                         write_new_file(path, str(self.settings[setting][0]))
             except Exception as error_writing_new_file:
-                await self.msg_error("bot.data_check", f"Error writing new file\n{setting} to {path}\nWill shutdown in 10 seconds", error_writing_new_file)
+                asyncio.run(self.msg_error("bot.data_check", f"Error writing new file\n{setting} to {path}\nWill shutdown in 10 seconds", error_writing_new_file))
                 time.sleep(10)
                 return False
         return True
