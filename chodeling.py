@@ -1,10 +1,11 @@
 import os
 import re
 import sys
+import json
 import math
 import time
-import json
 import asyncio
+import inspect
 import logging
 import datetime
 import keyboard
@@ -14,8 +15,8 @@ from decimal import Decimal
 from colorama import Fore, Style
 from twitchAPI.twitch import Twitch, TwitchUser
 from twitchAPI.oauth import UserAuthenticationStorageHelper
+from twitchAPI.chat import Chat, EventData, ChatMessage  #, ChatCommand
 from twitchAPI.type import AuthScope, ChatEvent, TwitchBackendException
-from twitchAPI.chat import Chat, EventData, ChatMessage
 from mongoengine import connect, disconnect_all, DEFAULT_CONNECTION_NAME, Document
 
 # ToDo; Add 'upsidedown text to everything' easter egg
@@ -41,155 +42,415 @@ directories = {
     "logs": f"{data_path}logs\\",
     "logs_archive": f"{data_path}logs\\archive_log\\"
 }
-
-auth_json = f"{directories['auth']}auth_info.json"
-chodeling_string = f"{directories['auth']}chodeling_string.txt"
-twitch_token = f"{directories['auth']}twitch_token.json"
-
 Path(directories['auth']).mkdir(parents=True, exist_ok=True)
 Path(directories['data']).mkdir(parents=True, exist_ok=True)
 Path(directories['logs']).mkdir(parents=True, exist_ok=True)
 Path(directories['logs_archive']).mkdir(parents=True, exist_ok=True)
 
 nl = "\n"
-logger_list = []
+log_list = []
+auth_json = f"{directories['auth']}auth_info.json"
+twitch_token = f"{directories['auth']}twitch_token.json"
+chodeling_string = f"{directories['auth']}chodeling_string.txt"
 
 
 class BotSetup(Twitch):
     def __init__(self, app_id: str, app_secret: str):
         super().__init__(app_id, app_secret)
         self.bot = Twitch
+        self.channel_details = {
+            "target_id": "268136120",
+            "target_name": "TheeChody"
+        }
         self.commands_available = {
-            "general": [
-                "clip",
-                "command",
-                "discord",
-                "followage",
-                "lastcomment",
-                "lurk",
-                "pointsburn",
-                "pointsgamble",
-                "sr",
-                "throne",
-                "tip",
-                "treat"
-            ],
-            "rank": [
-                "givepoints",
-                "levelcheck",
-                "levelleader",
-                "pointscheck",
-                "pointsleader"
-            ],
-            "mini_games": [
-                "bet",
-                "bingo",
-                "bite",
-                "burn",
-                "cutline",
-                "fight",
-                "fish",
-                "heist",
-                "iq",
-                "jail",
-                "kick",
-                "lick",
-                "numberize",
-                "pants",
-                "pinch",
-                "pounce",
-                "pp",
-                "punch",
-                "slap",
-                "tag",
-                "tickle",
-                "unoreverse",
-                "untag"
-            ],
-            "counter": [
-                "ats",
-                "cod",
-                "jointscount",
-                "streamcount"
-            ],
-            "marathon": [
-                "freepack",
-                "ice",
-                "loots",
-                "lube",
-                "time2add",
-                "timecurrent",
-                "timemax",
-                "timepause",
-                "timerate",
-                "timesofar",
-                "time"
-            ],
-            "special": [
-                "angryflip",
-                "attn",
-                "chodyhug",
-                "flip",
-                "free",
-                "fuck",
-                "holyshit"
-                "hug",
-                "shit"
-                "petty",
-                "rageflip",
-                "unflip",
-                "unholyshit",
-                "vanish"
-            ],
-            "chodelings": [
-                "ak",
-                "beckky",
-                "carnage",
-                "clammy",
-                "moist",
-                "dark",
-                "fire",
-                "hour",
-                "joe",
-                "lore",
-                "moony",
-                "mullens",
-                "mull",
-                "pious",
-                "queenpenguin",
-                "ronin",
-                "rubi",
-                "shat",
-                "silencer",
-                "toodles",
-                "whoudini",
-                "willsmash",
-                "xbox"
-            ],
-            "mods": [
-                "shutdown"
-            ],
-            "unlisted": [
-                "addlurk",
-                "addpoints",
-                "addtime",
-                "cardlube",
-                "changerate",
-                "clearlists",
-                "cuss",
-                "direction",
-                "pausetime",
-                "remtime",
-                "rtag",
-                "test"
-            ]
+            "general": {
+                "clip": {
+                    "capture_clip": "!clip"
+                },
+                "command": {
+                    "show_commands": "!cmd"
+                },
+                "discord": {
+                    "get_discord_invite_link": "!discord"
+                },
+                "followage": {
+                    "show_chodeling_follow_time": lambda: f"!followage @{input(f'Enter Username (Without @) Of Chodeling To See Follow Time{nl}')}",
+                    "show_your_follow_time": "!followage"
+                },
+                "lastcomment": {
+                    "repeat_your_last_message": "!lastcomment"
+                },
+                "lurk": {
+                    "toggle_lurk_status": lambda: self._toggle_lurk()
+                },
+                "pointsburn": {
+                    "burn_your_points": lambda: f"!pointsburn {input(f'Enter Your Desired Points To Burn (Raw Value){nl}')}"
+                },
+                "pointsgamble": {
+                    "toss_your_points_into_jackpot": lambda: f"!pointsgamble {input(f'Enter Your Desired Points To Toss Into Thee Bet Jackpot (Raw Value){nl}')}"
+                },
+                "sr": {
+                    "suggest_a_song": lambda: f"!sr {input(f'Enter A Band/Artist Name - Song Name{nl}')}"
+                },
+                "throne": {
+                    f"fetch_{self.channel_details['target_name'].lower()}'s_throne_link": "!throne"
+                },
+                "tip": {
+                    f"fetch_{self.channel_details['target_name'].lower()}'s_direct_dono_link": "!tip"
+                },
+                "treat": {
+                    f"fetch_{self.channel_details['target_name'].lower()}'s_direct_dono_link": "!treat"
+                }
+            },
+            "rank": {
+                "givepoints": {
+                    "give_chodeling_points": lambda: f"!givepoints @{input(f'Enter Username (Without @) Of Chodeling To Give Points To{nl}')} {input(f'Enter Amount To Give (Raw Value){nl}')}"
+                },
+                "levelcheck": {
+                    "check_chodeling_level": lambda: f"!checklevel @{input(f'Enter Username (Without @) Of Chodeling To Check Level{nl}')}",
+                    "check_your_level": "!checklevel"
+                },
+                "levelleader": {
+                    "check_level_leader": "!levelleader"
+                },
+                "pointscheck": {
+                    "check_chodeling_points": lambda: f"!checkpoints @{input(f'Enter Username (Without @) Of Chodeling To Check Points{nl}')}",
+                    "check_your_points": "!checkpoints"
+                },
+                "pointsleader": {
+                    "check_points_leader": "!pointsleader"
+                }
+            },
+            "mini_games": {
+                "bet": {
+                    "bet": lambda: self._bet(),
+                    "check_jackpot": "!bet total",
+                    "check_stats": "!bet stats",
+                    "double_b": "!bet doubleb"
+                },
+                "bingo": {
+                    "call_action": lambda: f"!bingo action {input(f'Enter # Or Type Entry Of What To Call{nl}')}",
+                    "join_game": "!bingo join",
+                    "view_board": "!bingo board",
+                    "view_called": "!bingo called"
+                },
+                "bite": {
+                    "bite_chodeling": lambda: f"!bite @{input(f'Enter Username (Without @) Of Chodeling To Bite{nl}')}",
+                    "view_stats": "!bite stats"
+                },
+                "burn": {
+                    "burn_chodeling": lambda: f"!burn @{input(f'Enter Username (Without @) Of Chodeling To Burn{nl}')}",
+                    "view_stats": "!burn stats"
+                },
+                "cutline": {
+                    "cut_chodeling_line": lambda: f"!cutline @{input(f'Enter Username (Without @) Of Chodeling To Attempt Cutline{nl}')}",
+                    "view_stats": "!cutline stats"
+                },
+                "fight": {
+                    "fight_chodeling": lambda: f"!fight @{input(f'Enter Username (Without @) Of Chodeling To Fight')}",
+                    "view_equipped_items": "!fight equipped",
+                    "view_stats": "!fight stats"
+                },
+                "fish": {
+                    "auto_cast": lambda: self._fish_auto_cast(int(input(f'Enter Desired Number Of Auto Casts To Purchase{nl}'))),
+                    "auto_cast_top_up": lambda: self._fish_auto_cast(),
+                    "manual_cast": lambda: self._fish_manual_cast(),
+                    "upgrade_line": lambda: self._fish_upgrade('line'),
+                    "upgrade_lure": lambda: self._fish_upgrade('lure'),
+                    "upgrade_reel": lambda: self._fish_upgrade('reel'),
+                    "upgrade_rod": lambda: self._fish_upgrade('rod'),
+                    "view_stats": "!fish stats"
+                },
+                "heist": {
+                    "execute_heist": lambda: self._heist_attempt(input(f'Enter Heist Crew # Or Name{nl}')),
+                    "view_stats": "!heist stats"
+                },
+                "iq": {
+                    "check_your_iq": lambda: self._check_iq(),
+                    "view_history": "!iq history"
+                },
+                "jail": {
+                    "jail_chodeling": lambda: f"!jail @{input(f'Enter Username (Without @) Of Chodeling To Attempt To Jail')}"
+                },
+                "kick": {
+                    "kick_chodeling": lambda: f"!kick @{input(f'Enter Username (Without @) Of Chodeling To Kick{nl}')}",
+                    "view_stats": "!kick stats"
+                },
+                "lick": {
+                    "lick_chodeling": lambda: f"!lick @{input(f'Enter Username (Without @) Of Chodeling To Lick{nl}')}",
+                    "view_stats": "!lick stats"
+                },
+                "numberize": {
+                    "numberize_a_number": lambda: f"!numberize {input(f'Enter A Raw Number To Numberize{nl}')}"
+                },
+                "pants": {
+                    "pants_chodeling": lambda: f"!pants @{input(f'Enter Username (Without @) Of Chodeling To Pants{nl}')}",
+                    "view_stats": "!pants stats"
+                },
+                "pinch": {
+                    "pinch_chodeling": lambda: f"!pinch @{input(f'Enter Username (Without @) Of Chodeling To Pinch{nl}')}",
+                    "view_stats": "!pinch stats"
+                },
+                "pounce": {
+                    "pounce_chodeling": lambda: f"!pounce @{input(f'Enter Username (Without @) Of Chodeling To Pounce{nl}')}",
+                    "view_stats": "!pounce stats"
+                },
+                "pp": {
+                    "check_your_pp": lambda: self._check_pp(),
+                    "view_history": "!pp history"
+                },
+                "punch": {
+                    "punch_chodeling": lambda: f"!punch @{input(f'Enter Username (Without @) Of Chodeling To Punch{nl}')}",
+                    "view_stats": "!punch stats"
+                },
+                "slap": {
+                    "slap_chodeling": lambda: f"!slap @{input(f'Enter Username (Without @) Of Chodeling To Slap{nl}')}",
+                    "view_stats": "!slap stats"
+                },
+                "tag": {
+                    "tag_chodeling": "!tag",
+                    "view_stats": "!tag stats"
+                },
+                "tickle": {
+                    "tickle_chodeling": lambda: f"!tickle @{input(f'Enter Username (Without @) Of Chodeling To Tickle{nl}')}",
+                    "view_stats": "!tickle stats"
+                },
+                "unoreverse": {
+                    "set_reverse_trigger": lambda: self._set_unoreverse(f"{input(f'Enter Desired New Uno Reverse Action{nl}(cutline | fight | jail){nl}').lower()}")
+                },
+                "untag": {
+                    "un_tag_yourself": "!untag"
+                }
+            },
+            "counter": {
+                "ats": {
+                    "reset_ats_count": "!atscount reset",
+                    "update_game_crash": lambda: f"!atscount update game {input(f'Enter Game Crash Update Number{nl}')}",
+                    "update_tractor_crash": lambda: f"!atscount update tractor {input(f'Enter Tractor Crash Update Number{nl}')}"
+                },
+                "bf": {
+                    "reset_bf_count": "!bfcount reset",
+                    "update_bf_game_crash": lambda: f"!bfcount game crash {input(f'Enter Game Crash Update Number{nl}')}",
+                    "update_bf_game_loss": lambda: f"!bfcount game loss {input(f'Enter Game Loss Update Number{nl}')}",
+                    "update_bf_game_win": lambda: f"!bfcount game win {input(f'Enter Game Win Update Number{nl}')}"
+                },
+                "jointscount": {
+                    "reset_joints_count": "!jointscount reset",
+                    "update_joints_count": lambda: f"!jointscount update {input(f'Enter Joints Count Update Number{nl}')}",
+                    "view_joints_count_history": "!jointscount history",
+                    "view_joints_count_session": "!jointscount"
+                },
+                "streamcount": {
+                    "view_restart_count_bot": "!streamcount bot",
+                    "view_restart_count_crash": "!streamcount crash"
+                }
+            },
+            "marathon": {
+                "freepack": {
+                     "redeem_free_pack": lambda: self._free_pack()
+                },
+                "ice": {
+                    "redeem_bucket_of_ice": lambda: self._use_special("ice")
+                },
+                "loots": {
+                    "fetch_latest_coupon_codes": "!loots"
+                },
+                "lube": {
+                    "redeem_bottle_of_lube": lambda: self._use_special("lube")
+                },
+                "time2add": {
+                    "fetch_time_left_to_be_added": "!time2add"
+                },
+                "timecurrent": {
+                    "fetch_current_time_left": "!timecurrent"
+                },
+                "timemax": {
+                    "fetch_marathon_cap": "!timemax"
+                },
+                "timepause": {
+                    "fetch_current_pause_time_remaining": "!timepause"
+                },
+                "timerate": {
+                    "fetch_current_time_rate": "!timerate"
+                },
+                "timesofar": {
+                    "fetch_so_far_time": "!timesofar"
+                },
+                "times": {
+                    "fetch_time_added_rates": "!time"
+                }
+            },
+            "special": {
+                "angryflip": {
+                    "send_a_angry_flip": "!angryflip"
+                },
+                "attn": {
+                    f"get_{self.channel_details['target_name'].lower()}_attn": "!attn"
+                },
+                "chodyhug": {
+                    "get_big_chody_hugs": "!chodyhug",
+                    "give_big_chody_hugs": lambda: f"!hug @{input(f'Enter Username (Without @) Of Chodeling You Wish To Hug{nl}')}"
+                },
+                "flip": {
+                    "flip_some_text": lambda: f"!flip {input(f'Enter Text You Wish To Flip{nl}')}"
+                },
+                "free": {
+                    "change_free2escape_nickname": "!free"
+                },
+                "fuck": {
+                    "fuck": "!fuck"
+                },
+                "holyshit": {
+                    "holyshit": "!holyshit"
+                },
+                "shit": {
+                    "shit": "!shit"
+                },
+                "petty": {
+                    "🧩_if_you_know_you_know_🧩": "!petty"
+                },
+                "rageflip": {
+                    "rageflip": "!rageflip"
+                },
+                "unflip": {
+                    "unflip": "!unflip"
+                },
+                "unholyshit": {
+                    "unholy_shit": "!unholyshit"
+                },
+                "vanish": {
+                    "disappear_into_thee_shadows": "!vanish"
+                }
+            },
+            "chodelings": {
+                "ak": {
+                    "ak": "!ak"
+                },
+                "beckky": {
+                    "beckky": "!beckky"
+                },
+                "carnage": {
+                    "carnage": "!carnage"
+                },
+                "chrispy_turtle": {
+                    "first_flavourite_word": "!clammy",
+                    "second_flavourite_word": "!moist"
+                },
+                "dark": {
+                    f"dark": "!dark"
+                },
+                "fire": {
+                    "fire": "!fire"
+                },
+                "hours": {
+                    "hours": "!hours"
+                },
+                "joe": {
+                    "joe": "!joe"
+                },
+                "maylore": {
+                    "maylore": "!lore"
+                },
+                "moony": {
+                    "moony": "!moony"
+                },
+                "mullens": {
+                    "mull": "!mull",
+                    "mullens": "!mullens"
+                },
+                "pious": {
+                    "pious": "!pious"
+                },
+                "queenpenguin": {
+                    "queenpenguin": "!queenpenguin"
+                },
+                "ronin": {
+                    "ronin": "!ronin"
+                },
+                "rubi": {
+                    "rubi": "!rubi"
+                },
+                "shat": {
+                    "shat": "!shat"
+                },
+                "silencer": {
+                    "silencer": "!silencer"
+                },
+                "toodles": {
+                    "toodles": "!toodles"
+                },
+                "whoudini": {
+                    "whoudini": "!whoudini"
+                },
+                "willsmash": {
+                    "willsmash": "!willsmash"
+                },
+                "xbox": {
+                    "xbox": "!xbox"
+                }
+            },
+            "mods": {
+                "shutdown": {
+                    "shutdown": lambda: self._shutdown()
+                }
+            },
+            "unlisted": {
+                "addlurk": {
+                    "add_chodeling_to_lurk": lambda: f"!addlurk @{input(f'Enter Name (Without @) Of Chodeling To Lurk{nl}')}"
+                },
+                "addpoints": {
+                    "add_points_to_chodeling": lambda: f"!addpoints @{input(f'Enter Name (Without @) Of Chodeling To Add Points Too{nl}')}"
+                },
+                "addtime": {
+                    "add_time_to_clock": lambda: f"!addtime {input(f'Enter Time To Add{nl}')} by @{input(f'Enter Name (Without @) Of Chodeling To Give Credit To (community^){nl}')} via {input(f'Enter Action Of Which Time Added Triggered{nl}')}"
+                },
+                "cardlube": {
+                    "add_lube_time": lambda: f"!cardlube by @{input(f'Enter Name (Without @) Of Chodeling To Give Credit To (community^){nl}')}"
+                },
+                "changerate": {
+                    "change_rate": lambda: f"!changerate {input(f'Enter New Phase{nl}')}-{input(f'Enter New Rate{nl}')} by @{input(f'Enter Name (Without @) Of Chodeling To Give Credit To (community^){nl}')} for {input(f'Enter Time New Phase For{nl}')}"
+                },
+                "clearlists": {
+                    "clear_lists": "!clearlists"
+                },
+                "cuss": {
+                    "add_cuss_time": lambda: f"!cuss {input(f'Enter Time{nl}')} by @{input(f'Enter Name (Without @) Of Chodeling To Give Credit To (community^){nl}')}"
+                },
+                "direction": {
+                    "change_direction": lambda: f"!direction {input(f'Enter Direction{nl}')}-{input(f'Enter Time{nl}')} by @{input(f'Enter Name (Without @) Of Chodeling To Give Credit To (community^){nl}')}"
+                },
+                "pausetime": {
+                    "add_pause_time": lambda: f"!pause {input(f'Enter Time{nl}')} by @{input(f'Enter Name (Without @) Of Chodeling To Give Credit To (community^){nl}')}"
+                },
+                "remtime": {
+                    "remove_time": lambda: f"!remtime {input(f'Enter Time{nl}')} by @{input(f'Enter Name (Without @) Of Chodeling To Give Credit To (community^){nl}')}"
+                },
+                "rtag": {
+                    "reset_current_tag": "!rtag"
+                },
+                "test": {
+                    "test_command": "!test"
+                }
+            }
         }
         self.const = {
-            "bingo_cost": 10000,
-            "level": 150,
-            "free_pack": 28800,
-            "wait_bet": 600,
-            "wait_heist": 21600
+            "bingo": {
+                "cost": 10000
+            },
+            "fish": {
+                "auto_cast_max": 300,
+                "auto_cast_min": 90,
+                "manual_cast_max": 90,
+                "manual_cast_min": 5
+            },
+            "rank": {
+                "level": 150
+            },
+            "wait": {
+                "bet": 600,
+                "free_pack": 28800,
+                "heist": 21600
+            }
         }
         self.data_settings = {
             "flash": f"{directories['data']}flash.txt",
@@ -203,10 +464,7 @@ class BotSetup(Twitch):
         }
         self.length = 100
         self.line_dash = "-"
-        self.login_details = {
-            "target_id": "268136120",
-            "target_name": "TheeChody"
-        }
+        self.name = "ChodeBot"
         self.settings = {
             "types_always_display": (
                 "auto_cast_remaining",
@@ -244,15 +502,6 @@ class BotSetup(Twitch):
             "joints_count_update": "^J",
             # "quit": "^Q"
         }
-        self.special_users = {
-            "bingo": {
-                "carnage_deamon": "659640208",
-                "Free2Escape": "777768639"
-            },
-            "game_admin": {
-                "TheeChodebot": "1023291886"
-            }
-        }
         self.target_scopes = [
             AuthScope.CHAT_READ,
             AuthScope.CHAT_EDIT,
@@ -260,27 +509,166 @@ class BotSetup(Twitch):
             AuthScope.USER_WRITE_CHAT
         ]
         self.variables_channel = {}
+        self.variables_chodeling = {}
         self.variables = {}
 
+    async def _bet(self) -> list | str:
+        now_time = datetime.datetime.now()
+        user_document = await refresh_document_user()
+        if user_document['data_games']['gamble']['last'] is None:
+            pass
+        elif now_time.timestamp() - user_document['data_games']['gamble']['last'].timestamp() < self.const['wait']['bet']:
+            return [False, f"Gotta Wait {str(datetime.timedelta(seconds=int(self.const['wait']['bet'] - (now_time.timestamp() - user_document['data_games']['gamble']['last'].timestamp())))).title()}", False]
+        return "!bet"
+
+    async def _fish_auto_cast(self, quantity: int = 0) -> list | str:
+        user_document = await refresh_document_user()
+        cast_difference = self.variables_channel['upgrades_fish']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit'] - (user_document['data_games']['fish']['auto']['cast'] + quantity)
+        if cast_difference > 0:
+            return f"!fish {cast_difference if user.id != self.variables_channel['bingo_mods']['Free2Escape'] else '6969'}"
+        else:
+            return [False, "Already At Maximum Auto Casts!!", False]
+
+    @staticmethod
+    async def _check_iq():
+        user_document = await refresh_document_user()
+        now_time = datetime.datetime.now()
+        if user_document['data_games']['iq']['last'] is None:
+            pass
+        elif now_time.day == user_document['data_games']['iq']['last'].day:
+            if now_time.month == user_document['data_games']['iq']['last'].month:
+                if now_time.year == user_document['data_games']['iq']['last'].year:
+                    return [False, f"You've already checked your IQ for thee day, it's {user_document['data_games']['iq']['current']}.", False]
+        return "!iq"
+
+    @staticmethod
+    async def _check_pp():
+        now_time = datetime.datetime.now()
+        user_document = await refresh_document_user()
+        if user.id == "627417784":  # Chrispy's ID
+            size = -69
+            user_document['data_games']['pp'] = [size, now_time, ["Always -69 inches depth"]]
+            user_document.save()
+            return [False, f"You are The King of Thee Innie's, as such has Thee Deepest of Deep Innie's at {size} inch innie", False]
+        elif user_document['data_games']['pp']['last'] is None:
+            pass
+        elif now_time.day == user_document['data_games']['pp']['last'].day:
+            if now_time.month == user_document['data_games']['pp']['last'].month:
+                if now_time.year == user_document['data_games']['pp']['last'].year:
+                    size = user_document['data_games']['pp']['size']
+                    return [False, f"You've already checked your pp size today, it's a {f'{size} inch pecker' if size > 0 else f'{size} inch innie'}", False]
+        return "!pp"
+
+    @staticmethod
+    async def _fish_manual_cast() -> list | str:
+        user_document = await refresh_document_user()
+        if user_document['data_games']['fish']['auto']['cast'] != 0:
+            return [False, "Already Auto Casting!!", False]
+        elif user_document['data_games']['fish']['line']['cast']:
+            return [False, "You're already casting!! Wait A Few!", False]
+        else:
+            return "!fish"
+
+    async def _fish_upgrade(self, upgrade_name: str) -> list | str:
+        user_document = await refresh_document_user()
+        if user_document['data_games']['fish']['upgrade'][upgrade_name] >= len(self.variables_channel['upgrades_fish'].keys()) - 1:
+            return [False, f"You're already at thee max {upgrade_name.title()} level; {user_document['data_games']['fish']['upgrade'][upgrade_name]}({self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name])]['name']})!!", False]
+        elif user_document['data_user']['rank']['points'] < self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name] + 1)]['cost']:
+            return [False, f"You don't have enough points to upgrade your '{upgrade_name.title()}' to {self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name] + 1)]['name']}({user_document['data_games']['fish']['upgrade'][upgrade_name] + 1}) tier, need {numberize(self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name] + 1)]['cost'])} {self.name} Points, but you only have {numberize(user_document['data_user']['rank']['points'])} {self.name} Points!!", False]
+        else:
+            return f"!fish upgrade {upgrade_name}"
+
+    @staticmethod
+    async def _free_pack() -> list | str:
+        now_time = datetime.datetime.now()
+        user_document = await refresh_document_user()
+        if user_document['data_user']['dates']['daily_cards'][1] is None:
+            pass
+        elif now_time.timestamp() - user_document['data_user']['dates']['daily_cards'][1].timestamp() < bot.const['wait']['free_pack']:
+            return [False, f"Gotta Wait {str(datetime.timedelta(seconds=int(bot.const['wait']['free_pack'] - (now_time.timestamp() - user_document['data_user']['dates']['daily_cards'][1].timestamp())))).title()}", False]
+        return "!freepack"
+
+    async def _heist_attempt(self, heist_crew: str = None) -> list | str:
+        now_time = datetime.datetime.now()
+        user_document = await refresh_document_user()
+        if user_document['data_games']['heist']['gamble']['last'] is None:
+            pass
+        elif now_time.timestamp() - user_document['data_games']['heist']['gamble']['last'].timestamp() < self.const['wait']['heist']:
+            return [False, f"Gotta Wait {str(datetime.timedelta(seconds=int(self.const['wait']['heist'] - (now_time.timestamp() - user_document['data_games']['heist']['gamble']['last'].timestamp())))).title()}", False]
+        return f"!heist {heist_crew if heist_crew is not None else await fetch_setting('heist')}"
+
+    @staticmethod
+    async def _set_unoreverse(new_action: str):
+        if new_action not in ("cutline", "fight", "jail"):
+            return [False, "Invalid Choice!!", False]
+        user_document = await refresh_document_user()
+        if new_action == user_document['data_games']['unoreverse']['command']:
+            return [False, f"You already have {new_action} set as your reverse choice!!", False]
+        return f"!unoreverse {new_action}"
+
+    async def _shutdown(self):
+        if not self.variables_chodeling['permissions']['mod']:
+            return [False, f"You cannot do this! How Thee Fuck Did You Find This? HaHa", False]
+        while True:
+            cls()
+            print(await top_bar("Sanity Check!!"))
+            user_input = input(f"Are you sure you want to attempt shutdown of {self.name}!??\n(Y/N): ").lower()
+            if user_input not in ("y", "yes", "n", "no"):
+                await self.invalid_entry(str)
+            else:
+                if user_input in ("y", "yes"):
+                    return "!shutdown"
+                else:
+                    return [False, "Alright, moving along. This never happened", False]
+
+    @staticmethod
+    async def _toggle_lurk() -> str:
+        channel_document = await refresh_document_channel()
+        if user.id in channel_document['data_lists']['lurk']:
+            return "!unlurk"
+        else:
+            return "!lurk"
+
+    @staticmethod
+    async def _use_special(_type: str):
+        user_document = await refresh_document_user()
+        if user_document['data_games']['fish']['special'][_type] == 0:
+            return [False, f"You don't have any {'buckets' if _type == 'ice' else 'bottles'} of {_type} to use!!", False]
+        return f"!{_type}"
+
     async def check_permissions(self, user_id: str, perm_check: str) -> bool:
-        bingo_mods = list(self.special_users['bingo'].values())
+        bingo_mods = list(self.variables_channel['bingo_mods'].values())
         channel_mods = self.variables_channel['mods']
-        game_admins = list(self.special_users['game_admin'].values())
+        game_admins = list(self.variables_channel['game_admins'].values())
         try:
-            if user_id == self.login_details['target_id']:
+            if user_id == self.channel_details['target_id']:
+                return True
+            elif perm_check == "mod" and user_id in channel_mods:
                 return True
             elif perm_check == "game_admin" and user_id in game_admins:
                 return True
-            elif perm_check == "mods" and user_id in channel_mods:
-                return True
-            elif perm_check == "mini_game_bingo" and user_id in list(bingo_mods + channel_mods + game_admins):
+            elif perm_check == "bingo_mod" and user_id in list(bingo_mods + channel_mods + game_admins):
                 return True
             return False
-        except Exception as error_permission_check:
-            await self.msg_error("check_permissions", "Generic Error", error_permission_check)
+        except Exception as _error:
+            await self.msg_error("check_permissions", "Generic Error", _error)
             return False
 
-    def data_check(self):
+    @staticmethod
+    async def check_self(chodeling: str, check_type: type(int) | type(str)) -> bool:
+        async def msg():
+            print("Can't choose yourself!!")
+            await asyncio.sleep(3)
+
+        if check_type == int and chodeling == user.id:
+            await msg()
+        elif check_type == str and chodeling == user.display_name.lower():
+            await msg()
+        else:
+            return False
+        return True
+
+    def data_check(self) -> bool:
         def write_new_file(filename: str, var_write: str):
             with open(filename, "w", encoding="utf-8") as file:
                 file.write(var_write)
@@ -300,42 +688,10 @@ class BotSetup(Twitch):
                         write_new_file(path, "#")
                     else:
                         write_new_file(path, str(self.settings[setting][0]))
-            except Exception as error_writing_new_file:
-                asyncio.run(self.msg_error("bot.data_check", f"Error writing new file\n{setting} to {path}\nWill shutdown in 10 seconds", error_writing_new_file))
+            except Exception as _error:
+                asyncio.run(self.msg_error("bot.data_check", f"Error writing new file\n{setting} to {path}\nWill shutdown in 10 seconds", _error))
                 time.sleep(10)
                 return False
-        return True
-
-    def long_dashes(self):
-        return f"{self.line_dash * self.length}"
-
-    def set_dashes(self):
-        self.length = read_file(self.data_settings['window_length'], int)
-        self.line_dash = read_file(self.data_settings['line_dash'], str)
-
-    def set_vars(self):
-        channel_document = asyncio.run(refresh_document_channel())
-        self.variables_channel['mods'] = channel_document['data_lists']['mods']
-        self.variables_channel['heist'] = channel_document['data_games']['heist']
-        self.variables_channel['upgrades_fish'] = channel_document['data_games']['fish']['upgrades']
-        for setting, setting_path in self.data_settings.items():
-            if setting not in ("line_dash", "window_length"):
-                self.variables[setting] = read_file(setting_path, str)
-
-    @staticmethod
-    async def check_self_id(chodeling_id: str):
-        if chodeling_id == user.id:
-            print(colour("yellow", "Can't choose yourself!!"))
-            await asyncio.sleep(3)
-            return False
-        return True
-
-    @staticmethod
-    async def check_self_name(chodeling_name: str):
-        if chodeling_name == user.display_name.lower():
-            print(colour("yellow", "Can't choose yourself!!"))
-            await asyncio.sleep(3)
-            return False
         return True
 
     @staticmethod
@@ -347,6 +703,9 @@ class BotSetup(Twitch):
     async def invalid_entry(invalid_type: type(str) | type(int)):
         print(f"{colour('red', 'Invalid')} {colour('yellow', 'Number' if invalid_type == int else 'Text')} {colour('red', 'entry, try again')}")
         await asyncio.sleep(2)
+
+    def long_dashes(self) -> str:
+        return f"{self.line_dash * self.length}"
 
     @staticmethod
     async def msg_error(function_name: str, error_type: any, error_str: any):
@@ -361,7 +720,7 @@ class BotSetup(Twitch):
     async def msg_no_perm():
         cls()
         print(await top_bar("Permission Error"))
-        input(f"{colour('yellow', 'Required Permissions Not Satisfied!!')}\n"
+        input(f"{colour('red', 'Required Permissions Not Satisfied!!')}\n"
               "Hit Enter to go back")
         await bot.go_back()
 
@@ -373,8 +732,29 @@ class BotSetup(Twitch):
               "Hit Enter To Go Back")
         await bot.go_back()
 
+    def set_dashes(self):
+        self.length = read_file(self.data_settings['window_length'], int)
+        self.line_dash = read_file(self.data_settings['line_dash'], str)
 
-# ----------- Bot Functions -----------
+    def set_vars(self):
+        channel_document = asyncio.run(refresh_document_channel())
+        self.variables_channel['bingo_mods'] = channel_document['data_lists']['bingo_mods']
+        self.variables_channel['game_admins'] = channel_document['data_lists']['game_admins']
+        self.variables_channel['heist'] = channel_document['data_games']['heist']
+        self.variables_channel['mods'] = channel_document['data_lists']['mods']
+        self.variables_channel['upgrades_fish'] = channel_document['data_games']['fish']['upgrades']
+        self.variables_chodeling['permissions'] = {
+            "bingo_mod": asyncio.run(self.check_permissions(user.id, "bingo_mod")),
+            "game_admin": asyncio.run(self.check_permissions(user.id, "game_admin")),
+            "mod": asyncio.run(self.check_permissions(user.id, "mod")),
+            "streamer": asyncio.run(self.check_permissions(user.id, "streamer"))
+        }
+        for setting, setting_path in self.data_settings.items():
+            if setting not in ("line_dash", "window_length"):
+                self.variables[setting] = read_file(setting_path, str)
+
+
+# ----------- App Functions -----------
 async def auth_bot():
     twitch_helper = UserAuthenticationStorageHelper(bot, bot.target_scopes, Path(twitch_token))
     await twitch_helper.bind()
@@ -411,13 +791,13 @@ def check_numbered_list(list_check: list) -> list:
         while item.startswith(" "):
             try:
                 item = item.lstrip(" ")
-            except Exception as error_stripping_whitespace:
-                asyncio.run(bot.msg_error("check_numbered_list", "Error stripping whitespace from start", error_stripping_whitespace))
+            except Exception as _error:
+                asyncio.run(bot.msg_error("check_numbered_list", "Error stripping whitespace from start", _error))
                 break
         try:
             new_list.append(remove_period_area(item.lower()))
-        except Exception as error_appending_new_list:
-            asyncio.run(bot.msg_error("check_numbered_list", f"Error appending '{item}' to new_list", error_appending_new_list))
+        except Exception as _error:
+            asyncio.run(bot.msg_error("check_numbered_list", f"Error appending '{item}' to new_list", _error))
             new_list.append(item.lower())
             continue
     return new_list
@@ -453,8 +833,8 @@ def connect_mongo(db, db_string, alias):
         client.get_default_database(db)
         logger.info(f"{fortime()}: Database Loaded\n{bot.long_dashes()}")
         return client
-    except Exception as e:
-        logger.error(f"{fortime()}: Error Connecting MongoDB -- {e}")
+    except Exception as _error:
+        logger.error(f"{fortime()}: Error Connecting MongoDB -- {_error}")
         return None
 
 
@@ -462,8 +842,8 @@ async def disconnect_mongo():
     try:
         disconnect_all()
         logger.info(f"{bot.long_dashes()}\nDisconnected from MongoDB")
-    except Exception as e:
-        logger.error(f"{fortime()}: Error Disconnection MongoDB -- {e}")
+    except Exception as _error:
+        logger.error(f"{fortime()}: Error Disconnection MongoDB -- {_error}")
         return
 
 
@@ -478,17 +858,17 @@ async def fetch_setting(setting: str) -> int | tuple:
         try:
             flash_frequency, flash_speed = bot.variables['flash'].split(', ', maxsplit=1)
             return int(flash_frequency), float(flash_speed)
-        except Exception as error_returning_flash:
-            await bot.msg_error("fetch_setting", "Returning flash Settings (Default '4, 0.5' Returned)", error_returning_flash)
+        except Exception as _error:
+            await bot.msg_error("fetch_setting", "Returning flash Settings (Default '4, 0.5' Returned)", _error)
             return 4, 0.5
     elif setting == "heist":
         try:
             return bot.settings['types_heist'].index(bot.variables['types_heist']) + 1
-        except Exception as error_returning_heist:
-            await bot.msg_error("fetch_setting", "heist_setting", error_returning_heist)
+        except Exception as _error:
+            await bot.msg_error("fetch_setting", "heist_setting", _error)
             return 0
     else:
-        await bot.msg_error("fetch_setting", "Invalid Entry (Returning Index 0)", f"{setting} is not a valid setting!!!")
+        await bot.msg_error("fetch_setting", "Invalid Entry (Returning 0)", f"{setting} is not a valid setting!!!")
         return 0
 
 
@@ -515,20 +895,18 @@ def fortime() -> str:
 
 
 async def get_auth_user_id() -> TwitchUser | None:
-    user = None
     user_info = bot.get_users()
     try:
         async for entry in user_info:
             if type(entry) == TwitchUser:
                 user = entry
-                break
+                return user
             else:
                 await bot.msg_error("get_auth_user_id", "Generic Error", "NO USER FOUND IN 'user_info'")
                 return None
-    except Exception as e:
-        await bot.msg_error("get_auth_user_id", "Generic Error", e)
+    except Exception as _error:
+        await bot.msg_error("get_auth_user_id", "Generic Error", _error)
         return None
-    return user
 
 
 def get_chodelings():
@@ -541,8 +919,8 @@ def get_length(item: float | int | list | str) -> int:
         return len(str(item))
     elif type(item) == list:
         length = 0
-        for _item in item:
-            _length = len(_item)
+        for item in item:
+            _length = len(item)
             length = _length if _length > length else length
         return length
     else:
@@ -562,19 +940,8 @@ def hotkey_listen():
         keyboard.add_hotkey("ctrl+shift+r+b", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish_beet']}\r"))
         keyboard.add_hotkey("ctrl+shift+s+r", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish_stroke']}\r"))
         keyboard.wait()
-    except Exception as e:
-        logger.error(f"{fortime()}: Error in 'hotkey_listen' -- {e}")
-
-
-async def log_shutdown(logger_list: list):
-    logging.shutdown()
-    for entry in logger_list:
-        try:
-            os.rename(f"{directories['logs']}{entry}", f"{directories['logs_archive']}{entry}")
-            print(f"{entry} moved to archives..")
-        except Exception as e:
-            print(e)
-            pass
+    except Exception as _error:
+        logger.error(f"{fortime()}: Error in 'hotkey_listen' -- {_error}")
 
 
 def max_length(item: str, length: int, n: int = None) -> str:
@@ -698,9 +1065,9 @@ def numberize(n: float, decimals: int = 2) -> str:
 
 async def print_status(status: bool, reason: str = "", error: bool = False):
     if status:
-        print(colour("green", "Message Sent To Chat Successfully"))
+        print(colour("green", f"Message Sent To Chat Successfully{f'{nl}{reason}' if reason != '' else ''}"))
     else:
-        print_msg = f"{colour('red', 'Message Send Failed')}\n{reason}"
+        print_msg = f"{colour('red', 'Message Send Failed')}\n{colour('yellow', reason)}"
         if error:
             await bot.msg_error("special_command", "msg_fail", print_msg)
         else:
@@ -756,8 +1123,8 @@ def read_file(file_name: str, return_type: type(bool) | type(dict) | type(float)
     except ValueError:
         variable = open_file()
         return f"ValueError Converting {variable} (type; {type(variable)}) to {return_type}"
-    except Exception as e:
-        error_msg = f"{fortime()}: Error in 'read_file' -- Generic Error -- {e}"
+    except Exception as _error:
+        error_msg = f"{fortime()}: Error in 'read_file' -- Generic Error -- {_error}"
         logger.error(error_msg)
         time.sleep(5)
         return error_msg
@@ -766,12 +1133,12 @@ def read_file(file_name: str, return_type: type(bool) | type(dict) | type(float)
 async def refresh_document_channel() -> Document | None:
     try:
         channel_collection = mongo_db.twitch.get_collection("channels")
-        return channel_collection.find_one({"_id": bot.login_details['target_id']})
+        return channel_collection.find_one({"_id": bot.channel_details['target_id']})
     except FileNotFoundError:
         await bot.msg_error("refresh_document_channel", "FileNotFound", FileNotFoundError)
         return None
-    except Exception as e:
-        await bot.msg_error("refresh_document_channel", "Generic", e)
+    except Exception as _error:
+        await bot.msg_error("refresh_document_channel", "Generic", _error)
         return None
 
 
@@ -790,8 +1157,8 @@ async def refresh_document_user(target_user: int | str = None) -> Document | Non
     except FileNotFoundError:
         await bot.msg_error("refresh_document_user", "FileNotFound", FileNotFoundError)
         return None
-    except Exception as e:
-        await bot.msg_error("refresh_document_user", "Generic", e)
+    except Exception as _error:
+        await bot.msg_error("refresh_document_user", "Generic", _error)
         return None
 
 
@@ -803,10 +1170,10 @@ def remove_period_area(var: str) -> str:
         return var
 
 
-def save_json(dict_: dict, file_save: str, first_create: bool = False):
-    if dict_ is not None:
+def save_json(_dict: dict, file_save: str, first_create: bool = False):
+    if _dict is not None:
         with open(file_save, "w", encoding="utf-8") as file:
-            json.dump(dict_, file, indent=4, ensure_ascii=False)
+            json.dump(_dict, file, indent=4, ensure_ascii=False)
         if first_create:
             logger.info(f"{fortime()}: First Time Run Detected!!\n'{auth_json}' File Created!")
             time.sleep(5)
@@ -814,20 +1181,32 @@ def save_json(dict_: dict, file_save: str, first_create: bool = False):
 
 async def send_chat_msg(msg: str) -> (bool, str, bool):
     try:
-        await bot.send_chat_message(bot.login_details['target_id'], user.id, msg)
+        await bot.send_chat_message(bot.channel_details['target_id'], user.id, msg)
         return True, "", False
     except TwitchBackendException:
         try:
             await asyncio.sleep(3)
-            await bot.send_chat_message(bot.login_details['target_id'], user.id, msg)
-            return True, colour("yellow", "TwitchBackendException Handled OK"), False
-        except Exception as error_twitch_backend:
-            return False, f"TwitchBackendException Handled FAIL\n{error_twitch_backend}", True
-    except Exception as general_error:
-        return False, f"Generic Error\n{general_error}", True
+            await bot.send_chat_message(bot.channel_details['target_id'], user.id, msg)
+            return True, "TwitchBackendException Handled OK", False
+        except Exception as _error:
+            return False, f"TwitchBackendException Handled FAIL\n{_error}", True
+    except Exception as _error:
+        return False, f"Generic Error\n{_error}", True
 
 
-def setup_logger(name: str, log_file: str, logger_list: list, level=logging.INFO):
+def shutdown_logger(_log_list: list):
+    logging.shutdown()
+    for entry in _log_list:
+        try:
+            os.rename(f"{directories['logs']}{entry}", f"{directories['logs_archive']}{entry}")
+            print(f"{entry} moved to archives..")
+        except Exception as _error:
+            print(_error)
+            time.sleep(10)
+            pass
+
+
+def setup_logger(name: str, log_file: str, _log_list: list, level=logging.INFO):
     try:
         local_logger = logging.getLogger(name)
         handler = logging.FileHandler(f"{directories['logs']}{log_file}", mode="w", encoding="utf-8")
@@ -836,12 +1215,12 @@ def setup_logger(name: str, log_file: str, logger_list: list, level=logging.INFO
             local_logger.addHandler(console_handler)
         local_logger.setLevel(level)
         local_logger.addHandler(handler)
-        logger_list.append(f"{log_file}")
+        _log_list.append(f"{log_file}")
         return local_logger
-    except Exception as e:
-        print(f"{fortime()}: ERROR in setup_logger - {name}/{log_file}/{level} -- {e}")
+    except Exception as _error:
+        print(f"{fortime()}: ERROR in setup_logger - {name}/{log_file}/{level} -- {_error}")
         time.sleep(15)
-        logger_list.append(None)
+        _log_list.append(None)
         return None
 
 
@@ -856,69 +1235,50 @@ def style(style_: str, str_: str) -> str:
 
 
 async def special_command(key_stroke: str):
+    def split_list(_list: list):
+        return "", _list[0], _list[1], _list[2]
+
     msg_send, status, reason, error = "", False, "", False
     try:
         if key_stroke == bot.special_commands['bet']:
-            msg = "!bet"
-            now_time = datetime.datetime.now()
-            user_document = await refresh_document_user()
-            if user_document['data_games']['gamble']['last'] is None:
-                msg_send = msg
-            elif now_time.timestamp() - user_document['data_games']['gamble']['last'].timestamp() < bot.const['wait_bet']:
-                wait_time = int(bot.const['wait_bet'] - (now_time.timestamp() - user_document['data_games']['gamble']['last'].timestamp()))
-                reason = colour("yellow", f"Gotta Wait {str(datetime.timedelta(seconds=wait_time)).title()}")
-            else:
-                msg_send = msg
+            msg_send = await bot._bet()
+            if type(msg_send) == list:
+                msg_send, status, reason, error = split_list(msg_send)
         elif key_stroke == bot.special_commands['bbet']:
             msg_send = "!bet doubleb"
         elif key_stroke == bot.special_commands['fish']:
-            user_document = await refresh_document_user()
-            cast_difference = bot.variables_channel['upgrades_fish']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit'] - user_document['data_games']['fish']['auto']['cast']
-            if cast_difference > 0:
-                msg_send = f"!fish {cast_difference if user.id != bot.special_users['bingo']['Free2Escape'] else '6969'}"
-            else:
-                reason = colour("yellow", "Already At Maximum Auto Casts!!")
+            msg_send = await bot._fish_auto_cast()
+            if type(msg_send) == list:
+                msg_send, status, reason, error = split_list(msg_send)
         elif key_stroke == bot.special_commands['fish_beet']:
             msg_send = "!fish beet rod"
         elif key_stroke == bot.special_commands['fish_stroke']:
             msg_send = "!fish stroke rod"
         elif key_stroke == bot.special_commands['free_pack']:
-            msg = "!freepack"
-            now_time = datetime.datetime.now()
-            user_document = await refresh_document_user()
-            if user_document['data_user']['dates']['daily_cards'][1] is None:
-                msg_send = msg
-            elif now_time.timestamp() - user_document['data_user']['dates']['daily_cards'][1].timestamp() < bot.const['free_pack']:
-                reason = colour("yellow", f"Gotta Wait {str(datetime.timedelta(seconds=int(bot.const['free_pack'] - (now_time.timestamp() - user_document['data_user']['dates']['daily_cards'][1].timestamp())))).title()}")
-            else:
-                msg_send = msg
+            msg_send = await bot._free_pack()
+            if type(msg_send) == list:
+                msg_send, status, reason, error = split_list(msg_send)
         elif key_stroke == bot.special_commands['heist']:
-            msg = f"!heist {await fetch_setting('heist')}"
-            now_time = datetime.datetime.now()
-            user_document = await refresh_document_user()
-            if user_document['data_games']['heist']['gamble']['last'] is None:
-                msg_send = msg
-            elif now_time.timestamp() - user_document['data_games']['heist']['gamble']['last'].timestamp() < bot.const['wait_heist']:
-                reason = colour("yellow", f"Gotta Wait {str(datetime.timedelta(seconds=int(bot.const['wait_heist'] - (now_time.timestamp() - user_document['data_games']['heist']['gamble']['last'].timestamp())))).title()}")
-            else:
-                msg_send = msg
+            msg_send = await bot._heist_attempt()
+            if type(msg_send) == list:
+                msg_send, status, reason, error = split_list(msg_send)
         elif key_stroke == bot.special_commands['joints_count_update']:
-            if await bot.check_permissions(user.id, "mods"):
+            if bot.variables_chodeling['permissions']['mod']:
                 msg_send = f"!jointscount update 1"
             else:
-                reason = colour("red", "You can't do that!")
+                reason = "You can't do that!"
         # ToDo; Figure this shit out
         # elif key_stroke == bot.special_commands['quit']:
         #     pass
         else:
-            reason = colour("red", f"{key_stroke} NOT VALID")
+            reason = f"{key_stroke} NOT VALID"
         if reason != "" and msg_send == "":
             await print_status(status, reason, error)
         else:
             status, reason, error = await send_chat_msg(msg_send)
             await print_status(status, reason, error)
-    except Exception as update_number_error:
-        await print_status(status, f"{fortime()}: Error in 'special_command' -- key_stroke; {key_stroke} -- Generic Error\n{update_number_error}", True)
+    except Exception as _error:
+        await print_status(False, f"{fortime()}: Error in 'special_command' -- key_stroke; {key_stroke} -- Generic Error\n{_error}", True)
 
 
 def title(text, valid_chars='_/\\|:;".,(') -> str:
@@ -942,8 +1302,8 @@ async def top_bar(left_side: str) -> str:
         boost = user_document['data_user']['rank']['boost']
         level = user_document['data_user']['rank']['level']
         level_before = level - 1
-        xp_needed_current = (bot.const['level'] * level_mult(level)) * level
-        xp_needed_last = (bot.const['level'] * level_mult(level_before)) * level_before
+        xp_needed_current = (bot.const['rank']['level'] * level_mult(level)) * level
+        xp_needed_last = (bot.const['rank']['level'] * level_mult(level_before)) * level_before
         xp_needed = xp_needed_current - xp_needed_last
         xp_into_level = max(0, xp - xp_needed_last)
         base_ratio = max(0, min(xp_into_level / xp_needed, 1))
@@ -963,8 +1323,8 @@ async def top_bar(left_side: str) -> str:
                 xp_text = f"{numberize(xp_into_level)}/{numberize(xp_needed)}({base_ratio * 100:.2f}%){f'{xp_key * 3}{numberize(boost)}({numberize((boost / xp_needed) * 100)}%)' if boost > 0 else ''}"
             else:
                 xp_text = f"INVALID SETTING '{bot.variables['types_xp_display']}'".replace(' ', xp_key)
-        except Exception as error_fetching_xp_show:
-            xp_text = f"INVALID SETTING '{bot.variables['types_xp_display']}' | {str(error_fetching_xp_show).upper()}".replace(' ', xp_key)
+        except Exception as _error:
+            xp_text = f"INVALID SETTING '{bot.variables['types_xp_display']}' | {str(_error).upper()}".replace(' ', xp_key)
         center_index = (bot.length - len(xp_text)) // 2
         for n, digit in enumerate(str(level)):
             slots[n] = (slots[n], digit)
@@ -991,11 +1351,11 @@ async def top_bar(left_side: str) -> str:
                 right_side = f"{numberize(user_document['data_user']['rank']['xp'])}/{numberize(xp_needed_current)}"
             else:
                 right_side = f"INVALID SETTING '{bot.variables['types_always_display']}'"
-        except Exception as error_fetching_always_show:
-            right_side = f"INVALID SETTING | {str(error_fetching_always_show).upper()}"
+        except Exception as _error:
+            right_side = f"INVALID SETTING | {str(_error).upper()}"
         return f"{left_side}{' ' * (bot.length - (len(left_side) + len(str(right_side))))}{right_side}\n{dashes}"
-    except Exception as error_creating_top_bar:
-        await bot.msg_error("top_bar", "Generic Error", error_creating_top_bar)
+    except Exception as _error:
+        await bot.msg_error("top_bar", "Generic Error", _error)
         return f"{left_side}\n{bot.long_dashes()}"
 
 
@@ -1025,79 +1385,137 @@ def update_auth_json(current_dict: dict) -> dict:
 
 
 # ----------- ChodelingApp Functions -----------
-async def chodeling_commands():
-    async def show_command_category(command_key: str):
-        if command_key in ("mods", "unlisted") and not await bot.check_permissions(user.id, "mods"):
-            await bot.msg_no_perm()
+async def chodeling_commands():  # ToDo; Build A "Flavourites" Command Category With Up To 10 Flavourite Commands
+    async def execute_command(command_execute):
+        if callable(command_execute):
+            try:
+                sig = inspect.signature(command_execute)
+                if len(sig.parameters) == 0:
+                    result = command_execute()
+                else:
+                    result = command_execute(sig.parameters.keys())
+                if inspect.iscoroutine(result):
+                    command_execute = await result
+                else:
+                    command_execute = result
+            except Exception as _error:
+                await bot.msg_error("chodeling_commands", f"Error executing {command_execute}", _error)
+                return
+        if type(command_execute) == list:
+            status, reason, error = command_execute[0], command_execute[1], command_execute[2]
         else:
+            status, reason, error = await send_chat_msg(command_execute)
+        await print_status(status, reason, error)
+
+    async def show_command_category(command_key: str):
+        async def show_command_options(command_name: str):
             while True:
                 cls()
                 options = []
-                length = get_length(len(bot.commands_available[command_key]))
-                print(await top_bar(f"{command_key.title()} Commands"))
-                try:
-                    for n, cmd in enumerate(sorted(bot.commands_available[command_key], key=lambda x: x), start=1):
-                        options.append(max_length(f"{n}. {cmd}", length, n))
-                except Exception as error_printing_command:
-                    await bot.msg_error("chodeling_commands", f"show_command '{command_key}'", error_printing_command)
-                user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
-                                   f"{bot.long_dashes()}\n"
-                                   f"{f'Enter # Or Type Command To View{nl}' if len(options) > 0 else ''}"
+                command_choices = bot.commands_available[command_key][command_name]
+                length = get_length(len(command_choices.keys()))
+                print(await top_bar(f"{command_name.title()} Commands"))
+                for n, key in enumerate(sorted(command_choices.keys(), key=lambda x: x), start=1):
+                    try:
+                        options.append(max_length(f"{n}. {title(key.replace('_', ' '))}", length, n))
+                    except Exception as _error:
+                        await bot.msg_error("chodeling_commands", "Error showing command options", _error)
+                        continue
+                if len(options) > 0:
+                    print(nl.join(options))
+                user_input = input(f"{bot.long_dashes()}\n"
+                                   f"{f'Enter # Or Name Of Command To Execute{nl}' if len(options) > 0 else ''}"
                                    f"Enter 0 To Go Back\n")
-                if user_input == "":
-                    await bot.invalid_entry(str)
-                elif user_input.isdigit():
+                if user_input.isdigit():
                     user_input = int(user_input)
                     if user_input == 0:
                         await bot.go_back()
                         break
                     elif user_input <= len(options):
-                        print(f"VALID -- You chose {remove_period_area(options[user_input - 1])}")
-                        await asyncio.sleep(2)
+                        await execute_command(command_choices[remove_period_area(options[user_input - 1]).replace(' ', '_').lower()])
                     else:
                         await bot.invalid_entry(int)
+                elif user_input.lower() in check_numbered_list(options):
+                    await execute_command(user_input.replace(' ', '_').lower())
                 elif user_input in bot.special_commands.values():
                     await special_command(user_input)
-                elif user_input.lower() in check_numbered_list(options):
-                    print(f"VALID -- You chose {user_input.lower()}")
-                    await asyncio.sleep(2)
                 else:
                     await bot.invalid_entry(str)
+
+        while True:
+            cls()
+            options = []
+            length = get_length(len(bot.commands_available[command_key].keys()))
+            print(await top_bar(f"{command_key.title()} Commands"))
+            for n, cmd in enumerate(sorted(bot.commands_available[command_key].keys(), key=lambda x: x), start=1):
+                try:
+                    options.append(max_length(f"{n}. {cmd.replace('_', ' ').title()}", length, n))
+                except Exception as _error:
+                    await bot.msg_error("chodeling_commands", f"show_command '{command_key}'", _error)
+                    continue
+            user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
+                               f"{bot.long_dashes()}\n"
+                               f"{f'Enter # Or Type Command To View{nl}' if len(options) > 0 else ''}"
+                               f"Enter 0 To Go Back\n")
+            if user_input == "":
+                await bot.invalid_entry(str)
+            elif user_input.isdigit():
+                user_input = int(user_input)
+                if user_input == 0:
+                    await bot.go_back()
+                    break
+                elif user_input <= len(options):
+                    await show_command_options(remove_period_area(options[user_input - 1]).replace(' ', '_').lower())
+                else:
+                    await bot.invalid_entry(int)
+            elif user_input.lower() in check_numbered_list(options):
+                await show_command_options(user_input.replace(' ', '_').lower())
+            elif user_input in bot.special_commands.values():
+                await special_command(user_input)
+            else:
+                await bot.invalid_entry(str)
 
     while True:
         cls()
         options = []
-        length = get_length(len(bot.commands_available.keys()))
-        print(await top_bar("Commands Area"))
-        try:
-            for n, key in enumerate(sorted(bot.commands_available.keys(), key=lambda x: x), start=1):
-                options.append(max_length(f"{n}. {key}", length, n))
-        except Exception as error_fetching_commands:
-            await bot.msg_error("chodeling_commands", "Fetching Specific Commands", error_fetching_commands)
-        if len(options) > 0:
-            for n, item in enumerate(check_numbered_list(options)):
-                if item in ("mods", "unlisted") and not await bot.check_permissions(user.id, "mods"):
+        available_commands = []
+        for key in sorted(bot.commands_available.keys(), key=lambda x: x):
+            try:
+                if key in ("counter", "mods") and not bot.variables_chodeling['permissions']['mod']:
+                    pass
+                elif key == "unlisted" and not bot.variables_chodeling['permissions']['streamer']:
                     pass
                 else:
-                    print(options[n])
+                    available_commands.append(key)
+            except Exception as _error:
+                await bot.msg_error("chodeling_commands", "Fetching Building Commands", _error)
+                continue
+        length = get_length(len(available_commands))
+        print(await top_bar("Commands Area"))
+        for n, item in enumerate(available_commands, start=1):
+            try:
+                options.append(max_length(f"{n}. {item.replace('_', ' ').title()}", length, n))
+            except Exception as _error:
+                await bot.msg_error("chodeling_commands", "Fetching Specific Commands", _error)
+                continue
+        if len(options) > 0:
+            print(nl.join(options))
         user_input = input(f"{bot.long_dashes()}\n"
                            f"{f'Enter # Or Type Command To View{nl}' if len(options) > 0 else ''}"
-                           f"Enter 0 To Go Back\n")
-        if user_input == "":
-            await bot.invalid_entry(str)
-        elif user_input.isdigit():
+                           f"Enter 0 To Return To Main Menu\n")
+        if user_input.isdigit():
             user_input = int(user_input)
             if user_input == 0:
                 await bot.go_back(True)
                 break
             elif user_input <= len(options):
-                await show_command_category(remove_period_area(options[user_input - 1]))
+                await show_command_category(remove_period_area(options[user_input - 1]).replace(' ', '_').lower())
             else:
                 await bot.invalid_entry(int)
+        elif user_input.lower() in check_numbered_list(options):
+            await show_command_category(user_input.replace(' ', '_').lower())
         elif user_input in bot.special_commands.values():
             await special_command(user_input)
-        elif len(options) > 0 and user_input.lower() in check_numbered_list(options):
-            await show_command_category(user_input.lower())
         else:
             await bot.invalid_entry(str)
 
@@ -1119,19 +1537,19 @@ async def chodeling_leaderboards():
         print(await top_bar(f"{leaderboard_name} Leaderboard"))
         for n, (key, value) in enumerate(leaderboard.items(), start=1):
             try:
-                str_ = max_length(f"{n}. ", length, n)
+                _str = max_length(f"{n}. ", length, n)
                 if type(value) == list:
                     if len(value) > 2:
                         for nn in range(0, len(value)):
-                            str_ += f"{numberize(value[nn])} | "
+                            _str += f"{numberize(value[nn])} | "
                     else:
-                        str_ += space(f'{numberize(value[0])}({numberize(value[1])}) | ')
-                    str_ += f"{key}"
+                        _str += space(f'{numberize(value[0])}({numberize(value[1])}) | ')
+                    _str += f"{key}"
                 else:
-                    str_ += f"{space(f'{numberize(value)} | ')}{key}"
-                print(str_)
-            except Exception as error_printing_str_:
-                await bot.msg_error("chodeling_leaderboards", "Error printing str_", error_printing_str_)
+                    _str += f"{space(f'{numberize(value)} | ')}{key}"
+                print(_str)
+            except Exception as _error:
+                await bot.msg_error("chodeling_leaderboards", "Error printing str_", _error)
                 continue
         input(f"{bot.long_dashes()}\nHit Enter To Go Back")
 
@@ -1148,7 +1566,7 @@ async def chodeling_leaderboards():
                            f"Enter  8 To View Jail Leaderboards\n"
                            f"Enter  9 To View Rank Leaderboards\n"
                            f"Enter 10 To View Tag Leaderboards\n"
-                           f"Enter  0 To Go Back\n")
+                           f"Enter  0 To Return To Main Menu\n")
         if user_input.isdigit():
             user_input = int(user_input)
             if user_input == 0:
@@ -1156,8 +1574,8 @@ async def chodeling_leaderboards():
                 break
             elif user_input == 1:
                 while True:
-                    async def build_bingo_dict(type_: str):
-                        dict_ = {}
+                    async def build_bingo_dict(_type: str):
+                        _dict = {}
                         chodelings = get_chodelings()
                         for chodeling in chodelings:
                             total = 0
@@ -1165,20 +1583,20 @@ async def chodeling_leaderboards():
                             major_points = 0
                             minor = 0
                             minor_points = 0
-                            for date_ in chodeling['data_games']['bingo']['history'].values():
-                                for data_ in date_.values():
+                            for date in chodeling['data_games']['bingo']['history'].values():
+                                for data in date.values():
                                     try:
                                         total += 1
-                                        major += 1 if data_['major_bingo'] else 0
-                                        if 'points_won' in data_:
-                                            major_points += data_['points_won']
-                                        minor += 1 if data_['minor_bingo'] else 0
-                                        minor_points += 10000 if data_['minor_bingo'] else 0
-                                    except Exception as error_building_bingo_dict:
-                                        await bot.msg_error("chodeling_leaderboards", "Error building bingo dictionary", error_building_bingo_dict)
+                                        major += 1 if data['major_bingo'] else 0
+                                        if 'points_won' in data:
+                                            major_points += data['points_won']
+                                        minor += 1 if data['minor_bingo'] else 0
+                                        minor_points += 10000 if data['minor_bingo'] else 0
+                                    except Exception as _error:
+                                        await bot.msg_error("chodeling_leaderboards", "Error building bingo dictionary", _error)
                                         continue
-                            dict_[chodeling['name']] = total if type_ == "total" else [major, major_points] if type_ == "major" else [minor, minor_points]
-                        return dict_
+                            _dict[chodeling['name']] = total if _type == "total" else [major, major_points] if _type == "major" else [minor, minor_points]
+                        return _dict
 
                     cls()
                     print(await top_bar("Bingo Leaderboard Options"))
@@ -1192,14 +1610,14 @@ async def chodeling_leaderboards():
                             await bot.go_back()
                             break
                         elif user_input == 1:
-                            dict_ = await build_bingo_dict("total")
-                            await show_leaderboard("Total Bingo Games", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                            _dict = await build_bingo_dict("total")
+                            await show_leaderboard("Total Bingo Games", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 2:
-                            dict_ = await build_bingo_dict("major")
-                            await show_leaderboard("Major Bingo Wins", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
+                            _dict = await build_bingo_dict("major")
+                            await show_leaderboard("Major Bingo Wins", dict(sorted(_dict.items(), key=lambda x: x[1][0], reverse=True)))
                         elif user_input == 3:
-                            dict_ = await build_bingo_dict("minor")
-                            await show_leaderboard("Minor Bingo Wins", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
+                            _dict = await build_bingo_dict("minor")
+                            await show_leaderboard("Minor Bingo Wins", dict(sorted(_dict.items(), key=lambda x: x[1][0], reverse=True)))
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
@@ -1207,11 +1625,11 @@ async def chodeling_leaderboards():
                     else:
                         await bot.invalid_entry(str)
             elif user_input == 2:
-                dict_ = {}
+                _dict = {}
                 chodelings = get_chodelings()
                 for chodeling in chodelings:
-                    dict_[chodeling['name']] = chodeling['data_user']['dates']['checkin_streak'][0]
-                await show_leaderboard("Check-in", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                    _dict[chodeling['name']] = chodeling['data_user']['dates']['checkin_streak'][0]
+                await show_leaderboard("Check-in", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
             elif user_input == 3:
                 while True:
                     cls()
@@ -1221,7 +1639,7 @@ async def chodeling_leaderboards():
                                        "Enter 3 For Total Leaderboard\n"
                                        "Enter 0 To Go Back\n")
                     if user_input.isdigit():
-                        dict_ = {}
+                        _dict = {}
                         chodelings = get_chodelings()
                         user_input = int(user_input)
                         if user_input == 0:
@@ -1230,46 +1648,46 @@ async def chodeling_leaderboards():
                         elif user_input == 1:
                             for chodeling in chodelings:
                                 total = 0
-                                for name_ in chodeling['data_games']['fight']['aggressor'].values():
-                                    for data_ in name_.values():
+                                for name in chodeling['data_games']['fight']['aggressor'].values():
+                                    for data in name.values():
                                         try:
-                                            total += len(data_.values())
-                                        except Exception as error_:
-                                            await bot.msg_error("chodeling_leaderboard", "Error building fight aggressor dictionary", error_)
+                                            total += len(data.values())
+                                        except Exception as _error:
+                                            await bot.msg_error("chodeling_leaderboard", "Error building fight aggressor dictionary", _error)
                                             continue
-                                dict_[chodeling['name']] = total
-                            await show_leaderboard("Fight", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                _dict[chodeling['name']] = total
+                            await show_leaderboard("Fight", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 2:
                             for chodeling in chodelings:
                                 total = 0
-                                for name_ in chodeling['data_games']['fight']['defender'].values():
-                                    for data_ in name_.values():
+                                for name in chodeling['data_games']['fight']['defender'].values():
+                                    for data_ in name.values():
                                         try:
                                             total += len(data_.values())
-                                        except Exception as error_:
-                                            await bot.msg_error("chodeling_leaderboard", "Error building fight defender dictionary", error_)
+                                        except Exception as _error:
+                                            await bot.msg_error("chodeling_leaderboard", "Error building fight defender dictionary", _error)
                                             continue
-                                dict_[chodeling['name']] = total
-                            await show_leaderboard("Fight", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                _dict[chodeling['name']] = total
+                            await show_leaderboard("Fight", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 3:
                             for chodeling in chodelings:
                                 total = 0
-                                for name_ in chodeling['data_games']['fight']['aggressor'].values():
-                                    for data_ in name_.values():
+                                for name in chodeling['data_games']['fight']['aggressor'].values():
+                                    for data in name.values():
                                         try:
-                                            total += len(data_.values())
-                                        except Exception as error_:
-                                            await bot.msg_error("chodeling_leaderboard", "Error building fight aggressor dictionary", error_)
+                                            total += len(data.values())
+                                        except Exception as _error:
+                                            await bot.msg_error("chodeling_leaderboard", "Error building fight aggressor dictionary", _error)
                                             continue
-                                for name_ in chodeling['data_games']['fight']['defender'].values():
-                                    for data_ in name_.values():
+                                for name in chodeling['data_games']['fight']['defender'].values():
+                                    for data in name.values():
                                         try:
-                                            total += len(data_.values())
-                                        except Exception as error_:
-                                            await bot.msg_error("chodeling_leaderboard", "Error building fight defender dictionary", error_)
+                                            total += len(data.values())
+                                        except Exception as _error:
+                                            await bot.msg_error("chodeling_leaderboard", "Error building fight defender dictionary", _error)
                                             continue
-                                dict_[chodeling['name']] = total
-                            await show_leaderboard("Fight", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                _dict[chodeling['name']] = total
+                            await show_leaderboard("Fight", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
@@ -1285,7 +1703,7 @@ async def chodeling_leaderboards():
                                        f"Enter 3 For Line Cuts Leaderboard\n"
                                        f"Enter 0 To Go Back\n")
                     if user_input.isdigit():
-                        dict_ = {}
+                        _dict = {}
                         chodelings = get_chodelings()
                         user_input = int(user_input)
                         if user_input == 0:
@@ -1294,35 +1712,35 @@ async def chodeling_leaderboards():
                         elif user_input == 1:
                             for chodeling in chodelings:
                                 total = 0
-                                for data_ in chodeling['data_games']['fish']['auto']['catches'].values():
+                                for data in chodeling['data_games']['fish']['auto']['catches'].values():
                                     try:
-                                        total += data_[0]
-                                    except Exception as error_:
-                                        await bot.msg_error("chodeling_leaderboard", "Error building auto catches", error_)
+                                        total += data[0]
+                                    except Exception as _error:
+                                        await bot.msg_error("chodeling_leaderboard", "Error building auto catches", _error)
                                         continue
-                                for data_ in chodeling['data_games']['fish']['totals']['auto']['catches'].values():
+                                for data in chodeling['data_games']['fish']['totals']['auto']['catches'].values():
                                     try:
-                                        total += data_[0]
-                                    except Exception as error_:
-                                        await bot.msg_error("chodeling_leaderboard", "Error building auto history catches", error_)
+                                        total += data[0]
+                                    except Exception as _error:
+                                        await bot.msg_error("chodeling_leaderboard", "Error building auto history catches", _error)
                                         continue
-                                dict_[chodeling['name']] = total
-                            await show_leaderboard("Auto Cast", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                _dict[chodeling['name']] = total
+                            await show_leaderboard("Auto Cast", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 2:
                             for chodeling in chodelings:
                                 total = 0
-                                for data_ in chodeling['data_games']['fish']['totals']['manual']['catches'].values():
+                                for data in chodeling['data_games']['fish']['totals']['manual']['catches'].values():
                                     try:
-                                        total += data_[0]
-                                    except Exception as error_:
-                                        await bot.msg_error("chodeling_leaderboard", "Error building manual catches", error_)
+                                        total += data[0]
+                                    except Exception as _error:
+                                        await bot.msg_error("chodeling_leaderboard", "Error building manual catches", _error)
                                         continue
-                                dict_[chodeling['name']] = total
-                            await show_leaderboard("Manual Cast", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                _dict[chodeling['name']] = total
+                            await show_leaderboard("Manual Cast", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 3:
                             while True:
                                 cls()
-                                dict_ = {}
+                                _dict = {}
                                 print(await top_bar("Line Cuts Leaderboard Options"))
                                 user_input = input("Enter 1 To Sort By Total Lines Cut\n"
                                                    "Enter 2 To Sort By Other Lines Cut\n"
@@ -1337,46 +1755,46 @@ async def chodeling_leaderboards():
                                     elif user_input == 1:
                                         for chodeling in chodelings:
                                             total = 0
-                                            for name_ in chodeling['data_games']['fish']['totals']['line']['cut_by'].values():
-                                                for data_ in name_.values():
+                                            for name in chodeling['data_games']['fish']['totals']['line']['cut_by'].values():
+                                                for data in name.values():
                                                     try:
-                                                        total += data_[0]
-                                                    except Exception as error_:
-                                                        await bot.msg_error("chodeling_leaderboard", "Error building line cut_by", error_)
+                                                        total += data[0]
+                                                    except Exception as _error:
+                                                        await bot.msg_error("chodeling_leaderboard", "Error building line cut_by", _error)
                                                         continue
-                                            for name_ in chodeling['data_games']['fish']['totals']['line']['cut_other'].values():
-                                                for data_ in name_.values():
+                                            for name in chodeling['data_games']['fish']['totals']['line']['cut_other'].values():
+                                                for data in name.values():
                                                     try:
-                                                        total += data_[0]
-                                                    except Exception as error_:
-                                                        await bot.msg_error("chodeling_leaderboard", "Error building line cut_other", error_)
+                                                        total += data[0]
+                                                    except Exception as _error:
+                                                        await bot.msg_error("chodeling_leaderboard", "Error building line cut_other", _error)
                                                         continue
-                                            dict_[chodeling['name']] = total
-                                        await show_leaderboard("Total Lines Cut", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                            _dict[chodeling['name']] = total
+                                        await show_leaderboard("Total Lines Cut", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                                     elif user_input == 2:
                                         for chodeling in chodelings:
                                             total = 0
-                                            for name_ in chodeling['data_games']['fish']['totals']['line']['cut_other'].values():
-                                                for data_ in name_.values():
+                                            for name in chodeling['data_games']['fish']['totals']['line']['cut_other'].values():
+                                                for data in name.values():
                                                     try:
-                                                        total += data_[0]
-                                                    except Exception as error_:
-                                                        await bot.msg_error("chodeling_leaderboard", "Error building line cut_other", error_)
+                                                        total += data[0]
+                                                    except Exception as _error:
+                                                        await bot.msg_error("chodeling_leaderboard", "Error building line cut_other", _error)
                                                         continue
-                                            dict_[chodeling['name']] = total
-                                        await show_leaderboard("Other Lines Cut", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                            _dict[chodeling['name']] = total
+                                        await show_leaderboard("Other Lines Cut", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                                     elif user_input == 3:
                                         for chodeling in chodelings:
                                             total = 0
-                                            for name_ in chodeling['data_games']['fish']['totals']['line']['cut_by'].values():
-                                                for data_ in name_.values():
+                                            for name in chodeling['data_games']['fish']['totals']['line']['cut_by'].values():
+                                                for data in name.values():
                                                     try:
-                                                        total += data_[0]
-                                                    except Exception as error_:
-                                                        await bot.msg_error("chodeling_leaderboard", "Error building line cut_by", error_)
+                                                        total += data[0]
+                                                    except Exception as _error:
+                                                        await bot.msg_error("chodeling_leaderboard", "Error building line cut_by", _error)
                                                         continue
-                                            dict_[chodeling['name']] = total
-                                        await show_leaderboard("Own Lines Cut", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                            _dict[chodeling['name']] = total
+                                        await show_leaderboard("Own Lines Cut", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                                     else:
                                         await bot.invalid_entry(int)
                                 elif user_input in bot.special_commands.values():
@@ -1403,7 +1821,7 @@ async def chodeling_leaderboards():
 
                 while True:
                     cls()
-                    dict_ = {}
+                    _dict = {}
                     print(await top_bar("Free Pack Leaderboard Options"))
                     user_input = input("Enter 1 To Sort By Total Free Packs\n"
                                        "Enter 2 To Sort By Command Free Packs\n"
@@ -1418,27 +1836,27 @@ async def chodeling_leaderboards():
                         elif user_input == 1:
                             for chodeling in chodelings:
                                 try:
-                                    dict_[chodeling['name']] = len(chodeling['data_user']['dates']['daily_cards'][2])
+                                    _dict[chodeling['name']] = len(chodeling['data_user']['dates']['daily_cards'][2])
                                 except Exception as _error:
                                     await bot.msg_error("chodeling_leaderboard", f"Error building {chodeling} free_pack dictionary", _error)
                                     continue
-                            await show_leaderboard("Free Pack Total", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                            await show_leaderboard("Free Pack Total", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 2:
                             for chodeling in chodelings:
                                 try:
-                                    dict_[chodeling['name']] = len(chodeling['data_user']['dates']['daily_cards'][2]) - await fetch_fish_packs(chodeling)
+                                    _dict[chodeling['name']] = len(chodeling['data_user']['dates']['daily_cards'][2]) - await fetch_fish_packs(chodeling)
                                 except Exception as _error:
                                     await bot.msg_error("chodeling_leaderboards", f"Error building {chodeling} freepack - fish dict entry", _error)
                                     continue
-                            await show_leaderboard("Free Pack Command", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                            await show_leaderboard("Free Pack Command", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 3:
                             for chodeling in chodelings:
                                 try:
-                                    dict_[chodeling['name']] = await fetch_fish_packs(chodeling)
+                                    _dict[chodeling['name']] = await fetch_fish_packs(chodeling)
                                 except Exception as _error:
                                     await bot.msg_error("chodeling_leaderboards", f"Error building {chodeling} freepack command dict", _error)
                                     continue
-                            await show_leaderboard("Free Pack Fish", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                            await show_leaderboard("Free Pack Fish", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
@@ -1447,17 +1865,17 @@ async def chodeling_leaderboards():
                         await bot.invalid_entry(str)
             elif user_input == 6:
                 while True:
-                    async def build_gamble_dict(type_: str):
-                        dict_ = {}
+                    async def build_gamble_dict(_type: str):
+                        _dict = {}
                         chodelings = get_chodelings()
                         for chodeling in chodelings:
                             try:
-                                gamble_ = chodeling['data_games']['gamble']
-                                dict_[chodeling['name']] = gamble_['total'] if type_ == "total" else [gamble_['won'], gamble_['total_won']] if type_ == "won" else [gamble_['lost'], gamble_['total_lost']]
+                                gamble = chodeling['data_games']['gamble']
+                                _dict[chodeling['name']] = gamble['total'] if _type == "total" else [gamble['won'], gamble['total_won']] if _type == "won" else [gamble['lost'], gamble['total_lost']]
                             except Exception as error_building_gamble_dict:
                                 await bot.msg_error("chodeling_leaderboards", "Error building gamble dict", error_building_gamble_dict)
                                 continue
-                        return dict_
+                        return _dict
 
                     cls()
                     print(await top_bar("Gamble Leaderboard Options"))
@@ -1471,14 +1889,14 @@ async def chodeling_leaderboards():
                             await bot.go_back()
                             break
                         elif user_input == 1:
-                            dict_ = await build_gamble_dict("total")
-                            await show_leaderboard("Gamble Total", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                            _dict = await build_gamble_dict("total")
+                            await show_leaderboard("Gamble Total", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 2:
-                            dict_ = await build_gamble_dict("won")
-                            await show_leaderboard("Gamble Wins", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
+                            _dict = await build_gamble_dict("won")
+                            await show_leaderboard("Gamble Wins", dict(sorted(_dict.items(), key=lambda x: x[1][0], reverse=True)))
                         elif user_input == 3:
-                            dict_ = await build_gamble_dict("lost")
-                            await show_leaderboard("Gamble Losses", dict(sorted(dict_.items(), key=lambda x: x[1][0], reverse=True)))
+                            _dict = await build_gamble_dict("lost")
+                            await show_leaderboard("Gamble Losses", dict(sorted(_dict.items(), key=lambda x: x[1][0], reverse=True)))
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
@@ -1487,24 +1905,24 @@ async def chodeling_leaderboards():
                         await bot.invalid_entry(str)
             elif user_input == 7:
                 async def build_general_dict(leader_type: str):
-                    dict_ = {}
+                    _dict = {}
                     chodelings = get_chodelings()
                     for chodeling in chodelings:
                         total = 0
                         try:
-                            for _game in chodeling['data_games']['heist'].values():
-                                for _crew in _game['history'].values():
-                                    for _date in _crew.values():
+                            for game in chodeling['data_games']['heist'].values():
+                                for crew in game['history'].values():
+                                    for date in crew.values():
                                         if leader_type == "total":
-                                            total += len(_date.keys())
+                                            total += len(date.keys())
                                         else:
-                                            for _data in _date.values():
-                                                total += 1 if _data['status'] and leader_type == "success" else 1 if not _data['status'] and leader_type == "fail" else 0
-                        except Exception as error_:
-                            await bot.msg_error("chodeling_leaderboard", f"Error building heist general dict for {chodeling}", error_)
+                                            for data in date.values():
+                                                total += 1 if data['status'] and leader_type == "success" else 1 if not data['status'] and leader_type == "fail" else 0
+                        except Exception as _error:
+                            await bot.msg_error("chodeling_leaderboard", f"Error building heist general dict for {chodeling}", _error)
                             continue
-                        dict_[chodeling['name']] = total
-                    await show_leaderboard(f"Heist {leader_type.title()}", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                        _dict[chodeling['name']] = total
+                    await show_leaderboard(f"Heist {leader_type.title()}", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
 
                 while True:
                     cls()
@@ -1555,32 +1973,32 @@ async def chodeling_leaderboards():
                                             await bot.invalid_entry(str)
                                     if key_type is None:
                                         break
-                                    dict_ = {}
+                                    _dict = {}
                                     chodelings = get_chodelings()
                                     for chodeling in chodelings:
                                         try:
                                             total = 0
                                             if crew_name in chodeling['data_games']['heist']['gamble']['history']:
-                                                for _date in chodeling['data_games']['heist']['gamble']['history'][crew_name].values():
+                                                for date in chodeling['data_games']['heist']['gamble']['history'][crew_name].values():
                                                     if key_type == "total":
-                                                        total += len(_date.keys())
+                                                        total += len(date.keys())
                                                     else:
-                                                        for _data in _date.values():
-                                                            total += 1 if _data['status'] and key_type == "success" else 1 if not _data['status'] and key_type == "fail" else 0
-                                            dict_[chodeling['name']] = total
+                                                        for data in date.values():
+                                                            total += 1 if data['status'] and key_type == "success" else 1 if not data['status'] and key_type == "fail" else 0
+                                            _dict[chodeling['name']] = total
                                         except Exception as _error:
                                             await bot.msg_error("chodeling_leaderboard", "build_heist_crew_dict", _error)
                                             continue
-                                    await show_leaderboard(f"Heist {crew_name} {key_type.title()}", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                    await show_leaderboard(f"Heist {crew_name} {key_type.title()}", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
 
                             while True:
                                 cls()
                                 options = []
                                 length = get_length(list(bot.variables_channel['heist']['crews'].keys()))
                                 print(await top_bar("Heist Leaderboard Sort By Crew Options"))
-                                for n, _data in enumerate(bot.variables_channel['heist']['crews'].values(), start=1):
+                                for n, data in enumerate(bot.variables_channel['heist']['crews'].values(), start=1):
                                     try:
-                                        options.append(max_length(f"{n}. {_data['name']}", length, n))
+                                        options.append(max_length(f"{n}. {data['name']}", length, n))
                                     except Exception as _error:
                                         await bot.msg_error("chodeling_leaderboard", "Error heist crew sort", _error)
                                         continue
@@ -1623,7 +2041,7 @@ async def chodeling_leaderboards():
                                        "Enter 3 For Total Leaderboard\n"
                                        "Enter 0 To Go Back\n")
                     if user_input.isdigit():
-                        dict_ = {}
+                        _dict = {}
                         chodelings = get_chodelings()
                         user_input = int(user_input)
                         if user_input == 0:
@@ -1632,40 +2050,40 @@ async def chodeling_leaderboards():
                         elif user_input == 1:
                             for chodeling in chodelings:
                                 total = 0
-                                for name_ in chodeling['data_games']['jail']['history'].values():
-                                    for data_ in name_['aggressor'].values():
+                                for name in chodeling['data_games']['jail']['history'].values():
+                                    for data in name['aggressor'].values():
                                         try:
-                                            total += data_
-                                        except Exception as error_:
-                                            await bot.msg_error("chodeling_leaderboard", "Error building jail aggressor dictionary", error_)
+                                            total += data
+                                        except Exception as _error:
+                                            await bot.msg_error("chodeling_leaderboard", "Error building jail aggressor dictionary", _error)
                                             continue
-                                dict_[chodeling['name']] = total
-                            await show_leaderboard("Jail", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                _dict[chodeling['name']] = total
+                            await show_leaderboard("Jail", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 2:
                             for chodeling in chodelings:
                                 total = 0
-                                for name_ in chodeling['data_games']['jail']['history'].values():
-                                    for data_ in name_['defender'].values():
+                                for name in chodeling['data_games']['jail']['history'].values():
+                                    for data in name['defender'].values():
                                         try:
-                                            total += data_
-                                        except Exception as error_:
-                                            await bot.msg_error("chodeling_leaderboard", "Error building jail defender dictionary", error_)
+                                            total += data
+                                        except Exception as _error:
+                                            await bot.msg_error("chodeling_leaderboard", "Error building jail defender dictionary", _error)
                                             continue
-                                dict_[chodeling['name']] = total
-                            await show_leaderboard("Jail", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                _dict[chodeling['name']] = total
+                            await show_leaderboard("Jail", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 3:
                             for chodeling in chodelings:
                                 total = 0
-                                for name_ in chodeling['data_games']['jail']['history'].values():
-                                    for data_type in name_.values():
-                                        for data_ in data_type.values():
+                                for name in chodeling['data_games']['jail']['history'].values():
+                                    for data_type in name.values():
+                                        for data in data_type.values():
                                             try:
-                                                total += data_
-                                            except Exception as error_:
-                                                await bot.msg_error("chodeling_leaderboard", "Error building jail total dictionary", error_)
+                                                total += data
+                                            except Exception as _error:
+                                                await bot.msg_error("chodeling_leaderboard", "Error building jail total dictionary", _error)
                                                 continue
-                                dict_[chodeling['name']] = total
-                            await show_leaderboard("Jail", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                                _dict[chodeling['name']] = total
+                            await show_leaderboard("Jail", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
@@ -1681,7 +2099,7 @@ async def chodeling_leaderboards():
                                        f"Enter 3 For Sort By XP Points\n"
                                        f"Enter 0 To Go Back\n")
                     if user_input.isdigit():
-                        dict_ = {}
+                        _dict = {}
                         chodelings = get_chodelings()
                         user_input = int(user_input)
                         if user_input == 0:
@@ -1690,27 +2108,27 @@ async def chodeling_leaderboards():
                         elif user_input == 1:
                             for chodeling in sorted(chodelings, key=lambda x: x['data_user']['rank']['level'], reverse=True):
                                 try:
-                                    dict_[chodeling['name']] = chodeling['data_user']['rank']['level']
-                                except Exception as error_:
-                                    await bot.msg_error("chodeling_leaderboard", "Error building rank level dictionary", error_)
+                                    _dict[chodeling['name']] = chodeling['data_user']['rank']['level']
+                                except Exception as _error:
+                                    await bot.msg_error("chodeling_leaderboard", "Error building rank level dictionary", _error)
                                     continue
-                            await show_leaderboard("Level", dict_)
+                            await show_leaderboard("Level", _dict)
                         elif user_input == 2:
                             for chodeling in sorted(chodelings, key=lambda x: x['data_user']['rank']['points'], reverse=True):
                                 try:
-                                    dict_[chodeling['name']] = chodeling['data_user']['rank']['points']
-                                except Exception as error_:
-                                    await bot.msg_error("chodeling_leaderboard", "Error building rank points dictionary", error_)
+                                    _dict[chodeling['name']] = chodeling['data_user']['rank']['points']
+                                except Exception as _error:
+                                    await bot.msg_error("chodeling_leaderboard", "Error building rank points dictionary", _error)
                                     continue
-                            await show_leaderboard("Points", dict_)
+                            await show_leaderboard("Points", _dict)
                         elif user_input == 3:
                             for chodeling in sorted(chodelings, key=lambda x: x['data_user']['rank']['xp'], reverse=True):
                                 try:
-                                    dict_[chodeling['name']] = chodeling['data_user']['rank']['xp']
-                                except Exception as error_:
-                                    await bot.msg_error("chodeling_leaderboard", "Error building rank xp dictionary", error_)
+                                    _dict[chodeling['name']] = chodeling['data_user']['rank']['xp']
+                                except Exception as _error:
+                                    await bot.msg_error("chodeling_leaderboard", "Error building rank xp dictionary", _error)
                                     continue
-                            await show_leaderboard("XP Points", dict_)
+                            await show_leaderboard("XP Points", _dict)
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
@@ -1720,11 +2138,11 @@ async def chodeling_leaderboards():
             elif user_input == 10:
                 while True:
                     async def build_tag_dict(key_name: str):
-                        dict_ = {}
+                        _dict = {}
                         chodelings = get_chodelings()
                         for chodeling in chodelings:
-                            dict_[chodeling['name']] = chodeling['data_games']['tag'][key_name]
-                        return dict_
+                            _dict[chodeling['name']] = chodeling['data_games']['tag'][key_name]
+                        return _dict
 
                     cls()
                     print(await top_bar("Tag Leaderboard Options"))
@@ -1738,14 +2156,14 @@ async def chodeling_leaderboards():
                             await bot.go_back()
                             break
                         elif user_input == 1:
-                            dict_ = await build_tag_dict('total')
-                            await show_leaderboard("Tag Total Games", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                            _dict = await build_tag_dict('total')
+                            await show_leaderboard("Tag Total Games", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 2:
-                            dict_ = await build_tag_dict('success')
-                            await show_leaderboard("Tag Successful Games", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                            _dict = await build_tag_dict('success')
+                            await show_leaderboard("Tag Successful Games", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         elif user_input == 3:
-                            dict_ = await build_tag_dict('fail')
-                            await show_leaderboard("Tag Fail Games", dict(sorted(dict_.items(), key=lambda x: x[1], reverse=True)))
+                            _dict = await build_tag_dict('fail')
+                            await show_leaderboard("Tag Fail Games", dict(sorted(_dict.items(), key=lambda x: x[1], reverse=True)))
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
@@ -1766,22 +2184,24 @@ async def chodeling_profile():
         user_document = await refresh_document_user()
         print(await top_bar("Rank Information"))
         length = get_length(list(user_document['data_user']['rank'].keys()))
-        for _key, _value in user_document['data_user']['rank'].items():
+        for key, value in user_document['data_user']['rank'].items():
             try:
-                print(f"{max_length(_key.title(), length)}: {f'{_value:,}' if _key == 'level' else numberize(_value)}")
-            except Exception as error_printing_chodeling_stats:
-                await bot.msg_error("chodeling_stats", "Error Printing Chodeling Stats", error_printing_chodeling_stats)
+                print(f"{max_length(key.title(), length)}: {f'{value:,}' if key == 'level' else numberize(value)}")
+            except Exception as _error:
+                await bot.msg_error("chodeling_stats", "Error Printing Chodeling Stats", _error)
                 continue
         user_input = input(f"{bot.long_dashes()}\n"
-                           "Enter 1 To View Bingo Stats\n"
-                           "Enter 2 To View Fight Stats\n"
-                           "Enter 3 To View Fish Stats\n"
-                           "Enter 4 To View Gamble Stats\n"
-                           "Enter 5 To View Heist Stats\n"
-                           "Enter 6 To View Jail Stats\n"
-                           "Enter 7 To View Other Stats\n"
-                           "Enter 8 To View Tag Stats\n"
-                           "Enter 0 To Return To Main Menu\n"
+                           "Enter  1 To View Bingo Stats\n"
+                           "Enter  2 To View Fight Stats\n"
+                           "Enter  3 To View Fish Stats\n"
+                           "Enter  4 To View Gamble Stats\n"
+                           "Enter  5 To View Heist Stats\n"
+                           "Enter  6 To View IQ Stats\n"
+                           "Enter  7 To View Jail Stats\n"
+                           "Enter  8 To View Other Stats\n"
+                           "Enter  9 To View PP Stats\n"
+                           "Enter 10 To View Tag Stats\n"
+                           "Enter  0 To Return To Main Menu\n"
                            "Enter Nothing To Refresh\n")
         if user_input == "":
             pass
@@ -1801,10 +2221,14 @@ async def chodeling_profile():
             elif user_input == 5:
                 await display_stats_heist()
             elif user_input == 6:
-                await display_stats_jail()
+                await display_stats_iq()
             elif user_input == 7:
-                await display_stats_other()
+                await display_stats_jail()
             elif user_input == 8:
+                await display_stats_other()
+            elif user_input == 9:
+                await display_stats_pp()
+            elif user_input == 10:
                 await display_stats_tag()
             else:
                 await bot.invalid_entry(int)
@@ -1837,8 +2261,8 @@ async def chodeling_settings_app():
             else:
                 bot.variables[key_write] = var_write
             print(f"{key_write.replace('_', ' ').title()} Variable set to: {var_write.replace('_', ' ').title()}")
-        except Exception as error_writing_var:
-            await bot.msg_error("app_settings", "Error writing var", error_writing_var)
+        except Exception as _error:
+            await bot.msg_error("app_settings", "Error writing var", _error)
         await bot.go_back()
 
     async def set_setting(setting_key: str):
@@ -1850,8 +2274,8 @@ async def chodeling_settings_app():
             try:
                 for n, var in enumerate(bot.settings[setting_key], start=1):
                     options.append(max_length(f"{n}. {var.replace('_', ' ').title()}", length, n))
-            except Exception as error_printing_display_variables:
-                await bot.msg_error("app_settings", "Error Printing Settings Options", error_printing_display_variables)
+            except Exception as _error:
+                await bot.msg_error("app_settings", "Error Printing Settings Options", _error)
             user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
                                f"{bot.long_dashes()}\n"
                                f"Enter X or Type Out Variable Name To Select\n"
@@ -1926,8 +2350,8 @@ async def chodeling_settings_app():
                                         else:
                                             flash_speed = user_input
                                         await write_var("flash", f"{flash_frequency}, {flash_speed}")
-                                    except Exception as error_writing_new_values:
-                                        await bot.msg_error("app_settings", "Setting Flash Settings", error_writing_new_values)
+                                    except Exception as _error:
+                                        await bot.msg_error("app_settings", "Setting Flash Settings", _error)
                                     break
 
                 while True:
@@ -2092,8 +2516,8 @@ async def display_stats_bingo():
                                     break
                     index = item_list.index(item) + 1
                     chodeling_board[row][index] = f"{style('bright' if minor_pattern_hit or status else 'normal', colour('cyan' if minor_pattern_hit else 'green' if status else 'red', str(index)))}"
-        except Exception as error_building_board:
-            await bot.msg_error("display_stats_bingo", "Building Board", error_building_board)
+        except Exception as _error:
+            await bot.msg_error("display_stats_bingo", "Building Board", _error)
         return chodeling_board
 
     async def call_action(action_to_call: str):
@@ -2104,8 +2528,8 @@ async def display_stats_bingo():
                     status, reason, error = False, f"'{action_to_call}' Is Already Called", False
                 else:
                     status, reason, error = await send_chat_msg(f"!bingo action {action_to_call}")
-            except Exception as error_calling_action:
-                await print_status(False, str(error_calling_action), True)
+            except Exception as _error:
+                await print_status(False, str(_error), True)
                 return
         else:
             status, reason, error = False, "Game Over/Not Running", False
@@ -2169,18 +2593,18 @@ async def display_stats_bingo():
                   f"{bot.long_dashes()}")
             dashes = '-' * ((5 * len(chodeling_board)) + (len(chodeling_board) + 1))
             print(dashes)
-            for row, items in chodeling_board.items():
+            for items in chodeling_board.values():
                 print(f"{print_row(items)}\n{dashes}")
-        except Exception as error_printing_board:
-            await bot.msg_error("display_stats_bingo", "Printing Board", error_printing_board)
+        except Exception as _error:
+            await bot.msg_error("display_stats_bingo", "Printing Board", _error)
 
     async def print_items(items_print: dict):
         try:
             length = get_length(len(items_print.keys()))
             for n, (item, status) in enumerate(items_print.items(), start=1):
                 print(f"{style('bright' if status else 'normal', colour('green' if status else 'red', max_length(f'{n}. {item}', length, n)))}")
-        except Exception as error_printing_list:
-            await bot.msg_error("display_stats_bingo", "Printing Available List", error_printing_list)
+        except Exception as _error:
+            await bot.msg_error("display_stats_bingo", "Printing Available List", _error)
 
     def print_row(items: dict) -> str:
         str_ = "|"
@@ -2220,8 +2644,8 @@ async def display_stats_bingo():
                         user_stats['total_major_bingo'] += 1
                     if data['minor_bingo']:
                         user_stats['total_minor_bingo'] += 1
-        except Exception as error_refreshing_stats:
-            await bot.msg_error("display_stats_bingo", "Error Refreshing user_stats", error_refreshing_stats)
+        except Exception as _error:
+            await bot.msg_error("display_stats_bingo", "Error Refreshing user_stats", _error)
         return user_stats
 
     async def show_history():
@@ -2231,8 +2655,8 @@ async def display_stats_bingo():
                     cls()
                     game_data = None
                     chodeling_document = await refresh_document_user(chodeling_name)
-                    for date_, times_ in chodeling_document['data_games']['bingo']['history'].items():
-                        for _game_data in times_.values():
+                    for date, times in chodeling_document['data_games']['bingo']['history'].items():
+                        for _game_data in times.values():
                             if _game_data['game_started'] == game_channel_dict['game_started_time']:
                                 game_data = _game_data
                                 break
@@ -2306,12 +2730,12 @@ async def display_stats_bingo():
                             break
                         elif user_input <= len(options):
                             chodeling_name = remove_period_area(options[user_input - 1])
-                            if await bot.check_self_name(chodeling_name):
+                            if not await bot.check_self(chodeling_name, str):
                                 await show_chodeling(chodeling_name)
                         else:
                             await bot.invalid_entry(int)
                     elif user_input.lower() in check_numbered_list(options):
-                        if await bot.check_self_name(user_input.lower()):
+                        if not await bot.check_self(user_input.lower(), str):
                             await show_chodeling(user_input.lower())
                     elif user_input in bot.special_commands.values():
                         await special_command(user_input)
@@ -2326,8 +2750,8 @@ async def display_stats_bingo():
                 try:
                     for n, key_time in enumerate(dict_date.keys(), start=1):
                         options.append(max_length(f"{n}. {key_time}", length, n))
-                except Exception as error_building_bingo_date:
-                    await bot.msg_error("display_stats_bingo", f"Error Building Times For {date_str}", error_building_bingo_date)
+                except Exception as _error:
+                    await bot.msg_error("display_stats_bingo", f"Error Building Times For {date_str}", _error)
                 if len(options) > 0:
                     print(nl.join(options))
                 user_input = input(f"{bot.long_dashes()}\n"
@@ -2361,13 +2785,13 @@ async def display_stats_bingo():
             if len(user_stats) > 0:
                 try:
                     total_games_channel = 0
-                    for _date in channel_document['data_games']['bingo']['history'].values():
-                        total_games_channel += len(_date.values())
+                    for date in channel_document['data_games']['bingo']['history'].values():
+                        total_games_channel += len(date.values())
                     total_games = user_stats['total_games']
                     total_major_bingo = user_stats['total_major_bingo']
                     total_minor_bingo = user_stats['total_minor_bingo']
                     points_won = user_stats['total_points_won']
-                    points_won_minor = total_minor_bingo * bot.const['bingo_cost']
+                    points_won_minor = total_minor_bingo * bot.const['bingo']['cost']
                     dict_print = {
                         "total_games_played": f"{numberize(total_games)}/{numberize(total_games_channel)}{'' if total_games == 0 else f' | {total_games / total_games_channel * 100:.2f}% ({numberize(points_won + points_won_minor)})'}",
                         "total_major_bingos": f"{numberize(total_major_bingo)}{'' if total_major_bingo == 0 else f' | {total_major_bingo / total_games * 100:.2f}% ({numberize(points_won)})'}",
@@ -2377,16 +2801,16 @@ async def display_stats_bingo():
                         for game_type in list(sorted(user_stats['game_types'].keys(), key=lambda x: x)):
                             dict_print[f"{game_type}_games_played"] = f"{numberize(user_stats['game_types'][game_type])} | {user_stats['game_types'][game_type] / total_games * 100:.2f}%"
                     length = get_length(list(dict_print.keys()))
-                    length_middle = get_length(list(_value.split('|', maxsplit=1)[0] for _value in dict_print.values()))
-                    for _key, _value in dict_print.items():
-                        _key_form = _key.replace('_', ' ').title()
-                        value_middle, value_end = _value.split('|', maxsplit=1)
-                        print(f"{max_length(f'{_key_form}', length)}: {max_length(value_middle, length_middle)}|{value_end}")
-                except Exception as error_building_dict_print:
-                    await bot.msg_error("display_stats_bingo", "Error building dict_print", error_building_dict_print)
+                    length_middle = get_length(list(value.split('|', maxsplit=1)[0] for value in dict_print.values()))
+                    for key, value in dict_print.items():
+                        key_form = key.replace('_', ' ').title()
+                        value_middle, value_end = value.split('|', maxsplit=1)
+                        print(f"{max_length(key_form, length)}: {max_length(value_middle, length_middle)}|{value_end}")
+                except Exception as _error:
+                    await bot.msg_error("display_stats_bingo", "Error building dict_print", _error)
             user_input = input(f"{bot.long_dashes()}\n"
                                f"Enter 1 To View Your Games\n"
-                               f"{f'Enter 2 To View All Games{nl}' if game_admin else ''}"
+                               f"{f'Enter 2 To View All Games{nl}' if bot.variables_chodeling['permissions']['game_admin'] else ''}"
                                f"Enter 0 To Go Back\n"
                                f"Enter Nothing To Refresh\n")
             if user_input == "":
@@ -2410,8 +2834,8 @@ async def display_stats_bingo():
                             length = get_length(len(user_document['data_games']['bingo']['history'].keys()))
                             for n, date in enumerate(user_document['data_games']['bingo']['history'].keys(), start=1):
                                 options.append(max_length(f"{n}. {date}", length, n))
-                        except Exception as error_building_bingo_games:
-                            await bot.msg_error("display_stats_bingo", "Error Building Bingo Games", error_building_bingo_games)
+                        except Exception as _error:
+                            await bot.msg_error("display_stats_bingo", "Error Building Bingo Games", _error)
                         if len(options) > 0:
                             print(nl.join(options))
                         user_input = input(f"{bot.long_dashes()}\n"
@@ -2437,7 +2861,7 @@ async def display_stats_bingo():
                             await bot.invalid_entry(str)
                 elif user_input == 2:
                     while True:
-                        if not game_admin:
+                        if not bot.variables_chodeling['permissions']['game_admin']:
                             await bot.msg_no_perm()
                             break
                         cls()
@@ -2453,8 +2877,8 @@ async def display_stats_bingo():
                             length = get_length(len(channel_document['data_games']['bingo']['history'].keys()))
                             for n, date in enumerate(channel_document['data_games']['bingo']['history'].keys(), start=1):
                                 options.append(max_length(f"{n}. {date}", length, n))
-                        except Exception as error_building_bingo_games:
-                            await bot.msg_error("display_stats_bingo", "Error building bingo game options-game admin", error_building_bingo_games)
+                        except Exception as _error:
+                            await bot.msg_error("display_stats_bingo", "Error building bingo game options-game admin", _error)
                         if len(options) > 0:
                             print(nl.join(options))
                         user_input = input(f"{bot.long_dashes()}\n"
@@ -2485,8 +2909,6 @@ async def display_stats_bingo():
             else:
                 await bot.invalid_entry(str)
 
-    bingo_perm = await bot.check_permissions(user.id, "mini_game_bingo")
-    game_admin = await bot.check_permissions(user.id, "game_admin")
     while True:
         cls()
         options = []
@@ -2501,10 +2923,10 @@ async def display_stats_bingo():
             options.append("Enter 3 To View History")
             if channel_document['data_games']['bingo']['current_game']['game_type'] is not None and user_document['data_games']['bingo']['current_game']['game_type'] is None:
                 options.append("Enter 4 To Join Bingo Game")
-            if game_admin:
+            if bot.variables_chodeling['permissions']['game_admin']:
                 options.append("Enter 5 To Admin Bingo Game")
-        except Exception as error_building_options:
-            await bot.msg_error("display_stats_bingo", "Error Building Options", error_building_options)
+        except Exception as _error:
+            await bot.msg_error("display_stats_bingo", "Error Building Options", _error)
         user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
                            "Enter 0 To Go Back\n")
         if user_input.isdigit():
@@ -2529,7 +2951,7 @@ async def display_stats_bingo():
                         await bot.go_back()
 
                 while True:
-                    if not await check_bingo_game_status(True if game_admin else False):
+                    if not await check_bingo_game_status(True if bot.variables_chodeling['permissions']['game_admin'] else False):
                         break
                     cls()
                     options = []
@@ -2543,13 +2965,13 @@ async def display_stats_bingo():
                               f"Major Jackpot: {numberize(game_dict['major_bingo_pot'])}\n"
                               f"Major Pattern: {game_dict['chosen_pattern'][0].replace('_', ' ').title()}\n"
                               f"Minor Pattern: {game_dict['chosen_pattern'][1].replace('_', ' ').title()}")
-                    except Exception as error_printing_bingo_game_info:
-                        await bot.msg_error("display_stats_bingo", "Printing Bingo Game Info", error_printing_bingo_game_info)
+                    except Exception as _error:
+                        await bot.msg_error("display_stats_bingo", "Printing Bingo Game Info", _error)
                     try:
                         for n, chodeling_name in enumerate(sorted(game_dict['chodelings'].keys(), key=lambda x: x), start=1):
                             options.append(max_length(f"{n}. {chodeling_name}", length, n))
-                    except Exception as error_building_chodelings_options:
-                        await bot.msg_error("display_stats_bingo", "Error Building Chodeling Options", error_building_chodelings_options)
+                    except Exception as _error:
+                        await bot.msg_error("display_stats_bingo", "Error Building Chodeling Options", _error)
                     if len(options) > 0:
                         print(f"{bot.long_dashes()}\n"
                               f"Chodeling's In Game;\n"
@@ -2596,7 +3018,7 @@ async def display_stats_bingo():
                     if len(chodeling_board) > 0:
                         await print_board(chodeling_board)
                     user_input = input(f"{bot.long_dashes()}\n"
-                                       f"{f'Enter # Or Type Out Item To Call{nl}' if bingo_perm or game_admin else ''}"
+                                       f"{f'Enter # Or Type Out Item To Call{nl}' if bot.variables_chodeling['permissions']['bingo_mod'] or bot.variables_chodeling['permissions']['game_admin'] else ''}"
                                        f"Enter 0 To Go Back\n"
                                        f"Enter Nothing To Refresh\n")
                     if user_input == "":
@@ -2606,13 +3028,16 @@ async def display_stats_bingo():
                         if user_input == 0:
                             await bot.go_back()
                             break
-                        elif bingo_perm or game_admin and user_input <= len(channel_document['data_games']['bingo']['current_game']['items']):
+                        elif bot.variables_chodeling['permissions']['bingo_mod'] or bot.variables_chodeling['permissions']['game_admin'] and user_input <= len(channel_document['data_games']['bingo']['current_game']['items']):
                             await call_action(list(channel_document['data_games']['bingo']['current_game']['items'].keys())[user_input - 1])
                         else:
                             await bot.invalid_entry(int)
+                    elif user_input.lower() == "quit game" and bot.variables_chodeling['permissions']['game_admin']:
+                        status, reason, error = await send_chat_msg("!bingo end")
+                        await print_status(status, reason, error)
                     elif user_input in bot.special_commands.values():
                         await special_command(user_input)
-                    elif bingo_perm or game_admin and user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
+                    elif bot.variables_chodeling['permissions']['bingo_mod'] or bot.variables_chodeling['permissions']['game_admin'] and user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
                         await call_action(title(user_input))
                     else:
                         await bot.invalid_entry(str)
@@ -2631,8 +3056,7 @@ async def display_stats_bingo():
                     status, reason, error = await send_chat_msg("!bingo join")
                     await print_status(status, reason, error)
             elif user_input == 5:
-                # ToDo; Add ability to end game from admin area & in-game area if game_admin
-                if not game_admin:
+                if not bot.variables_chodeling['permissions']['game_admin']:
                     await bot.msg_no_perm()
                 else:
                     while True:
@@ -2657,6 +3081,9 @@ async def display_stats_bingo():
                                 await call_action(list(channel_document['data_games']['bingo']['current_game']['items'].keys())[user_input - 1])
                             else:
                                 await bot.invalid_entry(int)
+                        elif user_input.lower() == "quit game":
+                            status, reason, error = await send_chat_msg("!bingo end")
+                            await print_status(status, reason, error)
                         elif user_input in bot.special_commands.values():
                             await special_command(user_input)
                         elif user_input.lower() in check_numbered_list(list(channel_document['data_games']['bingo']['current_game']['items'].keys())):
@@ -2679,25 +3106,25 @@ async def display_stats_fight():
                     cls()
                     length = get_length(list(user_document['data_games']['fight'][key][name][key_date][key_time].keys()))
                     print(await top_bar(f"{key_date.replace('-', '/')} {key_time} {name} {key.replace('_', ' ').title()} Fight"))
-                    for _key_fight, _key_data in user_document['data_games']['fight'][key][name][key_date][key_time].items():
+                    for key_fight, key_data in user_document['data_games']['fight'][key][name][key_date][key_time].items():
                         try:
-                            if type(_key_data) == list:
+                            if type(key_data) == list:
                                 options_list = []
-                                for item in reversed(_key_data):
+                                for item in reversed(key_data):
                                     try:
                                         options_list.append(item if type(item) not in (float, int) else numberize(item))
-                                    except Exception as error_list_item:
-                                        options_list.append(error_list_item)
+                                    except Exception as _error:
+                                        options_list.append(_error)
                                         continue
-                                print(f"{max_length(_key_fight.replace('_', ' ').title(), length)}: {' - '.join(options_list)}")
+                                print(f"{max_length(key_fight.replace('_', ' ').title(), length)}: {' - '.join(options_list)}")
                             else:
                                 try:
-                                    print(f"{max_length(_key_fight.replace('_', ' ').title(), length)}: {_key_data if type(_key_data) not in (float, int) else numberize(_key_data)}")
-                                except Exception as error_printing_item:
-                                    logger.error(f"{_key_fight} ERROR: {error_printing_item}")
+                                    print(f"{max_length(key_fight.replace('_', ' ').title(), length)}: {key_data if type(key_data) not in (float, int) else numberize(key_data)}")
+                                except Exception as _error:
+                                    logger.error(f"{key_fight} ERROR: {_error}")
                                     continue
-                        except Exception as error_building_fight_data:
-                            await bot.msg_error("display_stats_fight", f"Error Building Fight Data For {name} {key_date} {key_time}", error_building_fight_data)
+                        except Exception as _error:
+                            await bot.msg_error("display_stats_fight", f"Error Building Fight Data For {name} {key_date} {key_time}", _error)
                             continue
                     input(f"{bot.long_dashes()}\nHit Enter To Go Back")
                     await bot.go_back()
@@ -2711,8 +3138,8 @@ async def display_stats_fight():
                     try:
                         for n, time_ in enumerate(user_document['data_games']['fight'][key][name][key_date].keys(), start=1):
                             options.append(max_length(f"{n}. {time_}", length, n))
-                    except Exception as error_building_fight_times:
-                        await bot.msg_error("display_fight_stats", f"Error Building Fight Times for {name}", error_building_fight_times)
+                    except Exception as _error:
+                        await bot.msg_error("display_fight_stats", f"Error Building Fight Times for {name}", _error)
                     user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
                                        f"{bot.long_dashes()}\n"
                                        f"{f'Enter # Or Type Date To View{nl}' if len(options) > 0 else ''}"
@@ -2757,8 +3184,8 @@ async def display_stats_fight():
                             else:
                                 user_stats['fights_lost'] += 1
                                 user_stats['points_lost'] += game_data['points_lost']
-                except Exception as error_building_detailed_stats:
-                    await bot.msg_error("display_stats_fight", "Error Building Detailed Stats", error_building_detailed_stats)
+                except Exception as _error:
+                    await bot.msg_error("display_stats_fight", "Error Building Detailed Stats", _error)
                 return user_stats
 
             while True:
@@ -2771,16 +3198,16 @@ async def display_stats_fight():
                 for stat_name, stat in user_stats.items():
                     try:
                         print(f"{max_length(stat_name.replace('_', ' ').title(), length)}: {numberize(stat)}")
-                    except Exception as error_printing_detailed_stats:
-                        await bot.msg_error("display_stats_fight", "Error Printing Detailed Stats", error_printing_detailed_stats)
+                    except Exception as _error:
+                        await bot.msg_error("display_stats_fight", "Error Printing Detailed Stats", _error)
                         continue
                 length = get_length(len(user_document['data_games']['fight'][key][name].keys()))
 
                 for n, date in enumerate(user_document['data_games']['fight'][key][name].keys(), start=1):
                     try:
                         options.append(max_length(f"{n}. {date}", length, n))
-                    except Exception as error_building_fight_dates:
-                        await bot.msg_error("display_stats_fight", f"Error Building Fight Dates for {name}", error_building_fight_dates)
+                    except Exception as _error:
+                        await bot.msg_error("display_stats_fight", f"Error Building Fight Dates for {name}", _error)
                         continue
                 user_input = input(f"{f'{bot.long_dashes()}{nl}{nl.join(options)}{nl}' if len(options) > 0 else ''}"
                                    f"{bot.long_dashes()}\n"
@@ -2815,15 +3242,15 @@ async def display_stats_fight():
             for key_, value_ in user_stats[key].items():
                 try:
                     print(f"{max_length(key_.replace('_', ' ').title(), length)}: {numberize(value_)}")
-                except Exception as error_printing_stats:
-                    await bot.msg_error("display_stats_fight", f"Error printing {key} user_stats", error_printing_stats)
+                except Exception as _error:
+                    await bot.msg_error("display_stats_fight", f"Error printing {key} user_stats", _error)
                     continue
             try:
                 length = get_length(len(user_document['data_games']['fight'][key].keys()))
                 for n, chodeling in enumerate(list(sorted(user_document['data_games']['fight'][key].keys(), key=lambda x: x)), start=1):
                     options.append(max_length(f"{n}. {chodeling}", length, n))
-            except Exception as error_building_detailed_options:
-                await bot.msg_error("display_stats_fight", "Error Building Detailed Options", error_building_detailed_options)
+            except Exception as _error:
+                await bot.msg_error("display_stats_fight", "Error Building Detailed Options", _error)
             user_input = input(f"{f'{bot.long_dashes()}{nl}{nl.join(options)}{nl}' if len(options) > 0 else ''}"
                                f"{bot.long_dashes()}\n"
                                f"{f'Enter # Or Type Chodeling To View{nl}' if len(options) > 0 else ''}"
@@ -2882,8 +3309,8 @@ async def display_stats_fight():
                                 else:
                                     user_stats[key]['fights_lost'] += 1
                                     user_stats[key]['points_lost'] += game_stats['points_lost']
-        except Exception as error_building_user_stats:
-            await bot.msg_error("display_stats_fight", "Error Building user_stats", error_building_user_stats)
+        except Exception as _error:
+            await bot.msg_error("display_stats_fight", "Error Building user_stats", _error)
             return {}
         return user_stats
 
@@ -2898,8 +3325,8 @@ async def display_stats_fight():
                   f"Wins Total  : {numberize(user_stats['aggressor']['fights_won'] + user_stats['defender']['fights_won'])}\n"
                   f"Points Lost : {numberize(user_stats['aggressor']['points_lost'] + user_stats['defender']['points_lost'])}\n"
                   f"Points Won  : {numberize(user_stats['aggressor']['points_won'] + user_stats['defender']['points_won'])}")
-        except Exception as error_printing_all_stats:
-            await bot.msg_error("display_stats_fight", "Error printing all stats", error_printing_all_stats)
+        except Exception as _error:
+            await bot.msg_error("display_stats_fight", "Error printing all stats", _error)
         user_input = input(f"{bot.long_dashes()}\n"
                            f"Enter 1 To View Aggressor Fights\n"
                            f"Enter 2 To View Defender Fights\n"
@@ -2925,35 +3352,6 @@ async def display_stats_fight():
 
 
 async def display_stats_fish():
-    async def sort_print_list(dict_: dict, type_: str):
-        sortby = await fetch_setting("sortby")
-        if sortby is not None:
-            left_length = 0
-            right_length = 0
-            length = get_length(len(dict_.keys()))
-            if sortby == 0:
-                for n, (key, value) in enumerate(dict_.items(), start=1):
-                    len_key = len(f"{max_length(f'{n}. ', length, n)}{key}")
-                    len_value = len(f"{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})")
-                    left_length = len_key if len_key > left_length else left_length
-                    right_length = len_value if len_value > right_length else right_length
-            else:
-                for n, value in enumerate(dict_.values(), start=1):
-                    num_order = max_length(f"{n}. ", length, n)
-                    len_value = len(f"{num_order}{numberize(value[0])}") if sortby == 1 else len(f' {num_order}{numberize(value[1])} {numberize(value[1] / value[0])} ')
-                    len_value_right = len(f"Worth {numberize(value[1])} ({f'{numberize(value[1])})' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})") if sortby <= 2 else len(f"{numberize(value[0])} Times ")
-                    left_length = len_value if len_value > left_length else left_length
-                    right_length = len_value_right if len_value_right > right_length else right_length
-            for n, (key, value) in enumerate(dict(sorted(dict_.items(), key=lambda x: x[1 if sortby >= 1 else 0][0 if sortby == 0 else sortby - 1] if sortby <= 2 else x[1][1] / x[1][0])).items(), start=1):
-                if sortby == 0:
-                    print(space(f"Worth {numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", right_length, False, space(f"{max_length(f'{n}. ', length, n)}{key}", left_length, middle_txt=f'{type_.title()} {value[0]} Times')))
-                elif sortby == 1:
-                    print(space(f"Worth {numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[0])}", left_length, middle_txt=key)))
-                elif sortby == 2:
-                    print(space(f'{numberize(value[0])} Times', right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", left_length, middle_txt=key)))
-                else:
-                    print(space(f'{numberize(value[0])} Times', right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", left_length, middle_txt=key)))
-
     async def cutline_stats():
         async def detailed_stats(key_cut: str):
             async def print_details(name: str):
@@ -2977,8 +3375,8 @@ async def display_stats_fish():
                 try:
                     for n, name in enumerate(sorted(user_document['data_games']['fish']['totals']['line'][key_cut].keys(), key=lambda x: x), start=1):
                         options.append(max_length(f"{n}. {name}", length, n))
-                except Exception as error_printing_cutline_options:
-                    await bot.msg_error("display_stats_fish", "Error Displaying Cutline Detailed Stats", error_printing_cutline_options)
+                except Exception as _error:
+                    await bot.msg_error("display_stats_fish", "Error Displaying Cutline Detailed Stats", _error)
                 user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
                                    f"{bot.long_dashes()}\n"
                                    f"{f'Enter # Or Type Chodeling To View{nl}' if len(options) > 0 else ''}"
@@ -3016,10 +3414,10 @@ async def display_stats_fish():
                     f"other_line_cut_points_{'lost' if user_stats['cut_line']['other_line_points_lost'] > 0 else 'saved'}": numberize(user_stats['cut_line']['other_line_points_lost'] if user_stats['cut_line']['other_line_points_lost'] > 0 else abs(user_stats['cut_line']['other_line_points_lost']))
                 }
                 length = get_length(list(dict_print.keys()))
-                for _key, _value in dict_print.items():
-                    print(f"{max_length(_key.replace('_', ' ').title(), length)}: {_value}")
-            except Exception as error_printing_cutline_stats:
-                await bot.msg_error("display_stats_fish", "Printing CutLine Stats", error_printing_cutline_stats)
+                for key, value in dict_print.items():
+                    print(f"{max_length(key.replace('_', ' ').title(), length)}: {value}")
+            except Exception as _error:
+                await bot.msg_error("display_stats_fish", "Printing CutLine Stats", _error)
             user_input = input(f"{bot.long_dashes()}\n"
                                "Enter 1 To View Detailed Own Line Cut Stats\n"
                                "Enter 2 To View Detailed Other Line Cut Stats\n"
@@ -3051,25 +3449,29 @@ async def display_stats_fish():
                 break
             print(await top_bar(f"{key_type.title()} Fishing Stats;"))
             try:
-                auto_total_cost = numberize(user_stats['auto']['total_cost'])
+                auto_total_cost = numberize(-abs(user_stats['auto']['total_cost']))
                 auto_current_remaining = user_stats['auto']['current_remaining_casts']
                 auto_cast_limit = channel_document['data_games']['fish']['upgrades']['rod'][str(user_stats['levels']['rod'])]['autocast_limit']
                 current_remaining_time = user_stats['auto']['current_remaining_time']
+                estimated_time_remaining = user_stats['auto']['estimated_time_remaining']
                 dict_print = {
+                    "average_cast_time": user_stats['avg_cast_auto_time'] if key_type == "auto" else user_stats['avg_cast_man_time'],
                     "remaining_casts": f"{numberize(auto_current_remaining)}/{auto_cast_limit}" if key_type == "auto" else None,
+                    "estimated_time_remaining": estimated_time_remaining if key_type == "auto" else None,
                     "time_since_initiated": current_remaining_time if key_type == "auto" else None,
                     "total_casts": numberize(user_stats[key_type]['total_casts']),
                     "total_cost": f"{auto_total_cost}" if key_type == "auto" else None,
                     "total_gained": numberize(user_stats[key_type]['total_points_gain']),
                     "total_lost": numberize(user_stats[key_type]['total_points_lost']),
+                    "total_points_change": numberize(user_stats[key_type]['total_points_gain'] - (abs(user_stats[key_type]['total_points_lost']) + (user_stats['auto']['total_cost'] if key_type == "auto" else 0))),
                     "unique_catches": f"{len(user_stats[key_type]['total_unique_dict']):,}/{user_stats['total_items']:,}"
                 }
-                length = get_length(list(_key for _key, _value in dict_print.items() if _value is not None))
-                for _key, _value in dict_print.items():
-                    if _value is not None:
-                        print(f"{max_length(_key.replace('_', ' ').title(), length)}: {_value}")
-            except Exception as error_detailed_stats:
-                await bot.msg_error("display_stats_fish", f"Error Displaying user_stats for {key_type}", error_detailed_stats)
+                length = get_length(list(key for key, value in dict_print.items() if value is not None))
+                for key, value in dict_print.items():
+                    if value is not None:
+                        print(f"{max_length(key.replace('_', ' ').title(), length)}: {value}")
+            except Exception as _error:
+                await bot.msg_error("display_stats_fish", f"Error Displaying user_stats for {key_type}", _error)
             user_input = input(f"{bot.long_dashes()}\n"
                                f"Enter 1 To View Unique Catches List\n"
                                f"Enter 0 To Go Back\n"
@@ -3090,8 +3492,8 @@ async def display_stats_fish():
                             print(await top_bar(f"{key_type.title()} Fishing Unique Catches"))
                             await sort_print_list(user_stats[key_type]['total_unique_dict'], 'caught')
                         input(f"{bot.long_dashes()}\nHit Enter To Go Back")
-                    except Exception as error_printing_auto_catches:
-                        await bot.msg_error("display_stats_fish", f"Error Printing {key_type} Catches", error_printing_auto_catches)
+                    except Exception as _error:
+                        await bot.msg_error("display_stats_fish", f"Error Printing {key_type} Catches", _error)
                         input("\nHit Enter To Go Back")
                 else:
                     await bot.invalid_entry(int)
@@ -3100,69 +3502,50 @@ async def display_stats_fish():
             else:
                 await bot.invalid_entry(str)
 
-    async def upgrade_stats():
-        async def detailed_stats(key_type: str):
-            cls()
-            user_stats = await refresh_user_stats()
-            print(await top_bar(f"{key_type.title()} Detailed View"))
-            try:
-                length = get_length(list(channel_document['data_games']['fish']['upgrades'][key_type][str(user_stats['levels'][key_type])].keys()))
-                for key, value in channel_document['data_games']['fish']['upgrades'][key_type][str(user_stats['levels'][key_type])].items():
-                    print(f"{max_length(key.replace('_', ' ').title(), length)}: {value if key != 'cost' else numberize(value)}")
-            except Exception as error_printing_detailed_stats:
-                await bot.msg_error("display_stats_fish", f"Printing Detailed {key_type} Stats", error_printing_detailed_stats)
-            input(f"{bot.long_dashes()}\n"
-                  f"Hit Enter To Go Back")
-            await bot.go_back()
-
-        while True:
-            cls()
-            user_stats = await refresh_user_stats()
-            if len(user_stats) == 0:
-                break
-            print(await top_bar("Fishing Levels;"))
-            try:
-                print(f"Line: {user_stats['levels']['line']} ({channel_document['data_games']['fish']['upgrades']['line'][str(user_stats['levels']['line'])]['name']})\n"
-                      f"Lure: {user_stats['levels']['lure']} ({channel_document['data_games']['fish']['upgrades']['lure'][str(user_stats['levels']['lure'])]['name']})\n"
-                      f"Reel: {user_stats['levels']['reel']} ({channel_document['data_games']['fish']['upgrades']['reel'][str(user_stats['levels']['reel'])]['name']})\n"
-                      f"Rod : {user_stats['levels']['rod']} ({channel_document['data_games']['fish']['upgrades']['rod'][str(user_stats['levels']['rod'])]['name']})")
-            except Exception as error_printing_fishing_levels:
-                await bot.msg_error("display_stats_fishing", "Printing Fishing Levels", error_printing_fishing_levels)
-            user_input = input(f"{bot.long_dashes()}\n"
-                               "Enter 1 For Line Stats\n"
-                               "Enter 2 For Lure Stats\n"
-                               "Enter 3 For Reel Stats\n"
-                               "Enter 4 For Rod Stats\n"
-                               "Enter 0 To Go Back\n"
-                               "Enter Nothing To Refresh\n")
-            if user_input == "":
-                pass
-            elif user_input.isdigit():
-                user_input = int(user_input)
-                if user_input == 0:
-                    await bot.go_back()
-                    break
-                elif user_input == 1:
-                    await detailed_stats('line')
-                elif user_input == 2:
-                    await detailed_stats('lure')
-                elif user_input == 3:
-                    await detailed_stats('reel')
-                elif user_input == 4:
-                    await detailed_stats('rod')
-                else:
-                    await bot.invalid_entry(int)
-            elif user_input in bot.special_commands.values():
-                await special_command(user_input)
+    async def sort_print_list(_dict: dict, type_: str):
+        sortby = await fetch_setting("sortby")
+        if sortby is not None:
+            left_length = 0
+            right_length = 0
+            length = get_length(len(_dict.keys()))
+            if sortby == 0:
+                for n, (key, value) in enumerate(_dict.items(), start=1):
+                    len_key = len(f"{max_length(f'{n}. ', length, n)}{key}")
+                    len_value = len(f"{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})")
+                    left_length = len_key if len_key > left_length else left_length
+                    right_length = len_value if len_value > right_length else right_length
             else:
-                await bot.invalid_entry(str)
+                for n, value in enumerate(_dict.values(), start=1):
+                    num_order = max_length(f"{n}. ", length, n)
+                    len_value = len(f"{num_order}{numberize(value[0])}") if sortby == 1 else len(f' {num_order}{numberize(value[1])} {numberize(value[1] / value[0])} ')
+                    len_value_right = len(f"Worth {numberize(value[1])} ({f'{numberize(value[1])})' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})") if sortby <= 2 else len(f"{numberize(value[0])} Times ")
+                    left_length = len_value if len_value > left_length else left_length
+                    right_length = len_value_right if len_value_right > right_length else right_length
+            for n, (key, value) in enumerate(dict(sorted(_dict.items(), key=lambda x: x[1 if sortby >= 1 else 0][0 if sortby == 0 else sortby - 1] if sortby <= 2 else x[1][1] / x[1][0])).items(), start=1):
+                if sortby == 0:
+                    print(space(f"Worth {numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", right_length, False, space(f"{max_length(f'{n}. ', length, n)}{key}", left_length, middle_txt=f'{type_.title()} {value[0]} Times')))
+                elif sortby == 1:
+                    print(space(f"Worth {numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[0])}", left_length, middle_txt=key)))
+                elif sortby == 2:
+                    print(space(f'{numberize(value[0])} Times', right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", left_length, middle_txt=key)))
+                else:
+                    print(space(f'{numberize(value[0])} Times', right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", left_length, middle_txt=key)))
 
     async def refresh_user_stats() -> dict:
         try:
             user_document = await refresh_document_user()
+            cast_speed = (bot.variables_channel['upgrades_fish']['lure'][str(user_document['data_games']['fish']['upgrade']['lure'])]['effect'] / 12) + (bot.variables_channel['upgrades_fish']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['effect'] / 12) + (bot.variables_channel['upgrades_fish']['line'][str(user_document['data_games']['fish']['upgrade']['line'])]['effect'] / 12) + bot.variables_channel['upgrades_fish']['reel'][str(user_document['data_games']['fish']['upgrade']['reel'])]['effect']
+            start = max(90 - cast_speed, 30)
+            limit = max(300 - cast_speed, 90)
+            avg_cast_auto_time = (start + limit) / 2
+            avg_cast_man_time = 60
             total_items = len(channel_document['data_games']['fish']['items'])
             auto_total_cost = user_document['data_games']['fish']['auto']['cost'] + user_document['data_games']['fish']['totals']['auto']['cost']
             remaining_auto_cast = user_document['data_games']['fish']['auto']['cast']
+            if remaining_auto_cast > 0:
+                estimated_time_remaining = remaining_auto_cast * avg_cast_auto_time
+            else:
+                estimated_time_remaining = None
             line_level = user_document['data_games']['fish']['upgrade']['line']
             lure_level = user_document['data_games']['fish']['upgrade']['lure']
             reel_level = user_document['data_games']['fish']['upgrade']['reel']
@@ -3224,10 +3607,13 @@ async def display_stats_fish():
                         lines_cut_total_lost += value2[1]
             try:
                 dict_return = {
+                    "avg_cast_auto_time": str(datetime.timedelta(seconds=int(avg_cast_auto_time))).title(),
+                    "avg_cast_man_time": str(datetime.timedelta(seconds=int(avg_cast_man_time))).title(),
                     "total_items": total_items,
                     "auto": {
                         "current_remaining_casts": remaining_auto_cast,
-                        "current_remaining_time": None if remaining_auto_cast == 0 else str(datetime.timedelta(seconds=int(datetime.datetime.now().timestamp() - user_document['data_games']['fish']['auto']['initiated'].timestamp()))),
+                        "estimated_time_remaining": str(datetime.timedelta(seconds=int(estimated_time_remaining))).title(),
+                        "current_remaining_time": None if remaining_auto_cast == 0 else str(datetime.timedelta(seconds=int(datetime.datetime.now().timestamp() - user_document['data_games']['fish']['auto']['initiated'].timestamp()))).title(),
                         "total_casts": total_cast_auto,
                         "total_cost": auto_total_cost,
                         "total_points_gain": total_points_auto_add,
@@ -3253,13 +3639,13 @@ async def display_stats_fish():
                         "other_line_points_lost": lines_cut_total_lost
                     }
                 }
-            except Exception as error_building_dict_return:
-                await bot.msg_error("display_stats_fish", "Error Building Return Dictionary", error_building_dict_return)
+            except Exception as _error:
+                await bot.msg_error("display_stats_fish", "Error Building Return Dictionary", _error)
                 return {}
 
             return dict_return
-        except Exception as error_building_stats:
-            await bot.msg_error("display_stats_fish", "Error Building Stats", error_building_stats)
+        except Exception as _error:
+            await bot.msg_error("display_stats_fish", "Error Building Stats", _error)
             return {}
 
     def space(item: str, line_length: int, left: bool = True, left_item: str = "", middle_txt: str = ""):
@@ -3267,6 +3653,63 @@ async def display_stats_fish():
             return f"{item}{' ' * (line_length - len(item))} | {middle_txt}"
         else:
             return f"{left_item}{' ' * (len(bot.long_dashes()) - (len(left_item) + len(str(item))))}{item}"
+
+    async def upgrade_stats():
+        async def detailed_stats(key_type: str):
+            cls()
+            user_stats = await refresh_user_stats()
+            print(await top_bar(f"{key_type.title()} Detailed View"))
+            try:
+                length = get_length(list(channel_document['data_games']['fish']['upgrades'][key_type][str(user_stats['levels'][key_type])].keys()))
+                for key, value in channel_document['data_games']['fish']['upgrades'][key_type][str(user_stats['levels'][key_type])].items():
+                    print(f"{max_length(key.replace('_', ' ').title(), length)}: {value if key != 'cost' else numberize(value)}")
+            except Exception as _error:
+                await bot.msg_error("display_stats_fish", f"Printing Detailed {key_type} Stats", _error)
+            input(f"{bot.long_dashes()}\n"
+                  f"Hit Enter To Go Back")
+            await bot.go_back()
+
+        while True:
+            cls()
+            user_stats = await refresh_user_stats()
+            if len(user_stats) == 0:
+                break
+            print(await top_bar("Fishing Levels;"))
+            try:
+                print(f"Line: {user_stats['levels']['line']} ({channel_document['data_games']['fish']['upgrades']['line'][str(user_stats['levels']['line'])]['name']})\n"
+                      f"Lure: {user_stats['levels']['lure']} ({channel_document['data_games']['fish']['upgrades']['lure'][str(user_stats['levels']['lure'])]['name']})\n"
+                      f"Reel: {user_stats['levels']['reel']} ({channel_document['data_games']['fish']['upgrades']['reel'][str(user_stats['levels']['reel'])]['name']})\n"
+                      f"Rod : {user_stats['levels']['rod']} ({channel_document['data_games']['fish']['upgrades']['rod'][str(user_stats['levels']['rod'])]['name']})")
+            except Exception as _error:
+                await bot.msg_error("display_stats_fishing", "Printing Fishing Levels", _error)
+            user_input = input(f"{bot.long_dashes()}\n"
+                               "Enter 1 For Line Stats\n"
+                               "Enter 2 For Lure Stats\n"
+                               "Enter 3 For Reel Stats\n"
+                               "Enter 4 For Rod Stats\n"
+                               "Enter 0 To Go Back\n"
+                               "Enter Nothing To Refresh\n")
+            if user_input == "":
+                pass
+            elif user_input.isdigit():
+                user_input = int(user_input)
+                if user_input == 0:
+                    await bot.go_back()
+                    break
+                elif user_input == 1:
+                    await detailed_stats('line')
+                elif user_input == 2:
+                    await detailed_stats('lure')
+                elif user_input == 3:
+                    await detailed_stats('reel')
+                elif user_input == 4:
+                    await detailed_stats('rod')
+                else:
+                    await bot.invalid_entry(int)
+            elif user_input in bot.special_commands.values():
+                await special_command(user_input)
+            else:
+                await bot.invalid_entry(str)
 
     while True:
         cls()
@@ -3321,26 +3764,26 @@ async def display_stats_gamble():
 
                 }
             }
-        except Exception as error_building_user_stats:
-            await bot.msg_error("display_stats_gamble", "Error Building user_stats", error_building_user_stats)
+        except Exception as _error:
+            await bot.msg_error("display_stats_gamble", "Error Building user_stats", _error)
             return {}
         return user_stats
 
     while True:
         cls()
         user_stats = await refresh_stats()
-        length = get_length(list(f'{_key} {_key_}' for _key in user_stats.keys() for _key_ in user_stats[_key].keys()))
+        length = get_length(list(f'{key} {_key}' for key in user_stats.keys() for _key in user_stats[key].keys()))
         print(await top_bar("Gamble Stats"))
-        for _key, _value in user_stats.items():
-            for _key_, _value_ in _value.items():
+        for key, value in user_stats.items():
+            for _key, _value in value.items():
                 try:
-                    form__key_ = f"{_key_.replace('_', ' ').title()}"
-                    if _key == "total":
-                        print(f"{max_length(f'{_key.title()} {form__key_}', length)}: {_value_}")
+                    _key_form = f"{_key.replace('_', ' ').title()}"
+                    if key == "total":
+                        print(f"{max_length(f'{key.title()} {_key_form}', length)}: {_value}")
                     else:
-                        print(f"{max_length(f'{form__key_} {_key.title()}', length)}: {_value_}%")
-                except Exception as error_printing_user_stats:
-                    await bot.msg_error("display_stats_gamble", "Error Printing user_stats", error_printing_user_stats)
+                        print(f"{max_length(f'{_key_form} {key.title()}', length)}: {_value}%")
+                except Exception as _error:
+                    await bot.msg_error("display_stats_gamble", "Error Printing user_stats", _error)
                     continue
         user_input = input(f"{bot.long_dashes()}\n"
                            f"Enter 0 To Go Back\n"
@@ -3382,8 +3825,8 @@ async def display_stats_heist():
                 try:
                     for n, game_time in enumerate(user_document['data_games']['heist']['gamble']['history'][key_crew][key_date].keys(), start=1):
                         options.append(max_length(f"{n}. {game_time}", length, n))
-                except Exception as error_printing_times:
-                    await bot.msg_error("display_stats_heist", f"Error building times options for {key_date}", error_printing_times)
+                except Exception as _error:
+                    await bot.msg_error("display_stats_heist", f"Error building times options for {key_date}", _error)
                 user_input = input(f"{f'{bot.long_dashes()}{nl}{nl.join(options)}{nl}' if len(options) > 0 else ''}"
                                    f"{f'{bot.long_dashes()}{nl}Enter # Or Type Time To View{nl}' if len(options) > 0 else ''}"
                                    f"Enter 0 To Go Back\n"
@@ -3415,8 +3858,8 @@ async def display_stats_heist():
             try:
                 for n, date in enumerate(user_document['data_games']['heist']['gamble']['history'][key_crew].keys(), start=1):
                     options.append(max_length(f"{n}. {date}", length, n))
-            except Exception as error_building_crew_dates:
-                await bot.msg_error("display_stats_heist", "Error building crew dates", error_building_crew_dates)
+            except Exception as _error:
+                await bot.msg_error("display_stats_heist", "Error building crew dates", _error)
             user_input = input(f"{f'{bot.long_dashes()}{nl}{nl.join(options)}{nl}' if len(options) > 0 else ''}"
                                f"{f'{bot.long_dashes()}{nl}Enter # Or Type Date To View{nl}' if len(options) > 0 else ''}"
                                f"Enter 0 To Go Back\n"
@@ -3458,8 +3901,8 @@ async def display_stats_heist():
                             user_stats['total_gain'] += game_data['points_gained']
                         else:
                             user_stats['total_fail'] += 1
-        except Exception as error_building_user_stats_global:
-            await bot.msg_error("display_stats_heist", "Error building user_stats global", error_building_user_stats_global)
+        except Exception as _error:
+            await bot.msg_error("display_stats_heist", "Error building user_stats global", _error)
         return user_stats
 
     while True:
@@ -3469,19 +3912,19 @@ async def display_stats_heist():
         user_stats = await refresh_global_stats()
         length = get_length(list(user_stats.keys()))
         print(await top_bar("Heist History"))
-        for _key, _value in user_stats.items():
+        for key, value in user_stats.items():
             try:
-                print(f"{max_length(_key.replace('_', ' ').title(), length)}: {numberize(_value)}")
-            except Exception as error_printing_user_stats_global:
-                await bot.msg_error("display_stats_heist", "Error printing user_stats global", error_printing_user_stats_global)
+                print(f"{max_length(key.replace('_', ' ').title(), length)}: {numberize(value)}")
+            except Exception as _error:
+                await bot.msg_error("display_stats_heist", "Error printing user_stats global", _error)
                 continue
         print(bot.long_dashes())
         length = get_length(len(user_document['data_games']['heist']['gamble']['history'].keys()))
-        for n, _game_date in enumerate(user_document['data_games']['heist']['gamble']['history'].keys(), start=1):
+        for n, game_date in enumerate(user_document['data_games']['heist']['gamble']['history'].keys(), start=1):
             try:
-                options.append(max_length(f"{n}. {_game_date}", length, n))
-            except Exception as error_building_crew_options:
-                await bot.msg_error("display_stats_heist", "Error building crew options", error_building_crew_options)
+                options.append(max_length(f"{n}. {game_date}", length, n))
+            except Exception as _error:
+                await bot.msg_error("display_stats_heist", "Error building crew options", _error)
                 continue
         user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
                            f"{bot.long_dashes()}\n"
@@ -3507,17 +3950,55 @@ async def display_stats_heist():
             await bot.invalid_entry(str)
 
 
+async def display_stats_iq():
+    async def display_history():
+        cls()
+        user_document = await refresh_document_user()
+        print(await top_bar("IQ History"))
+        for i in range(0, len(user_document['data_games']['iq']['history']), bot.length):
+            print(', '.join(user_document['data_games']['iq']['history'][i:i + bot.length]))
+        input(f"Hit Enter To Go Back")
+
+    while True:
+        cls()
+        user_document = await refresh_document_user()
+        print(await top_bar("IQ Stats"))
+        dict_print = {
+            "last_checked": user_document['data_games']['iq']['last'],
+            "current": user_document['data_games']['iq']['current']
+        }
+        length = get_length(list(dict_print.keys()))
+        for key, value in dict_print.items():
+            key_form = key.replace('_', ' ').title()
+            print(f"{max_length(f'{key_form}', length)}: {value}")
+        user_input = input(f"Enter 1 To View History\n"
+                           f"Enter 0 To Go Back\n")
+        if user_input.isdigit():
+            user_input = int(user_input)
+            if user_input == 0:
+                await bot.go_back()
+                break
+            elif user_input == 1:
+                await display_history()
+            else:
+                await bot.invalid_entry(int)
+        elif user_input in bot.special_commands.values():
+            await special_command(user_input)
+        else:
+            await bot.invalid_entry(str)
+
+
 async def display_stats_jail():
     async def display_detailed_chodeling(chodeling_name: str):
         async def display_detailed_stats(key_type: str):
             cls()
             length = get_length(list(user_document['data_games']['jail']['history'][chodeling_name][key_type].keys()))
             print(await top_bar(f"Jail Stats -> {chodeling_name} {key_type.title()} Stats"))
-            for _key, _value in user_document['data_games']['jail']['history'][chodeling_name][key_type].items():
+            for key, value in user_document['data_games']['jail']['history'][chodeling_name][key_type].items():
                 try:
-                    print(f"{max_length(_key.replace('_', ' ').title(), length)}: {numberize(_value)}")
-                except Exception as error_printing_chodeling_detailed_stats:
-                    await bot.msg_error("display_stats_jail", f"Error printing {chodeling_name} detailed {key_type} stats", error_printing_chodeling_detailed_stats)
+                    print(f"{max_length(key.replace('_', ' ').title(), length)}: {numberize(value)}")
+                except Exception as _error:
+                    await bot.msg_error("display_stats_jail", f"Error printing {chodeling_name} detailed {key_type} stats", _error)
                     continue
             input(f"{bot.long_dashes()}\n"
                   f"Hit Enter To Go Back")
@@ -3530,8 +4011,8 @@ async def display_stats_jail():
             for n, _type in enumerate(user_document['data_games']['jail']['history'][chodeling_name].keys(), start=1):
                 try:
                     options.append(max_length(f"{n}. {_type.title()}", length, n))
-                except Exception as error_building_detailed_chodeling_types:
-                    await bot.msg_error("display_stats_jail", "Error building detailed chodeling types", error_building_detailed_chodeling_types)
+                except Exception as _error:
+                    await bot.msg_error("display_stats_jail", "Error building detailed chodeling types", _error)
                     continue
             if len(options) > 0:
                 print(nl.join(options))
@@ -3562,11 +4043,11 @@ async def display_stats_jail():
             keys_sorted = sorted(user_document['data_games']['jail']['history'].keys(), key=lambda x: x)
             length = get_length(len(keys_sorted))
             print(await top_bar("Jail Stats -> Chodeling Options"))
-            for n, _chodeling in enumerate(keys_sorted, start=1):
+            for n, chodeling in enumerate(keys_sorted, start=1):
                 try:
-                    options.append(max_length(f"{n}. {_chodeling}", length, n))
-                except Exception as error_building_chodelings_stats_options:
-                    await bot.msg_error("display_stats_jail", "Error building chodelings options detailed stats", error_building_chodelings_stats_options)
+                    options.append(max_length(f"{n}. {chodeling}", length, n))
+                except Exception as _error:
+                    await bot.msg_error("display_stats_jail", "Error building chodelings options detailed stats", _error)
                     continue
             if len(options) > 0:
                 print(nl.join(options))
@@ -3603,19 +4084,19 @@ async def display_stats_jail():
             "shielded": user_document['data_games']['jail']['shield_times'],
             "uno_reverse": 0
         }
-        for _chodeling in user_document['data_games']['jail']['history'].values():
-            for _data in _chodeling.values():
+        for chodeling in user_document['data_games']['jail']['history'].values():
+            for data in chodeling.values():
                 try:
-                    user_stats['success'] += _data['success']
-                    user_stats['fail'] += _data['fail']
-                    user_stats['escaped'] += _data['escaped']
-                    user_stats['uno_reverse'] += _data['uno_reverse']
-                except Exception as error_in_refresh_jail_stats_loop:
-                    await bot.msg_error("display_stats_jail", "Error in refresh_jail_stats loop", error_in_refresh_jail_stats_loop)
+                    user_stats['success'] += data['success']
+                    user_stats['fail'] += data['fail']
+                    user_stats['escaped'] += data['escaped']
+                    user_stats['uno_reverse'] += data['uno_reverse']
+                except Exception as _error:
+                    await bot.msg_error("display_stats_jail", "Error in refresh_jail_stats loop", _error)
                     continue
-        for _key, _value in user_stats.items():
-            if _key != "total":
-                user_stats['total'] += _value
+        for key, value in user_stats.items():
+            if key != "total":
+                user_stats['total'] += value
         return user_stats
 
     while True:
@@ -3624,8 +4105,8 @@ async def display_stats_jail():
         user_stats = await refresh_jail_stats()
         length = get_length(list(user_stats.keys()))
         print(await top_bar("Jail Stats"))
-        for _key, _value in user_stats.items():
-            print(f"{max_length(_key.replace('_', ' ').title(), length)}: {numberize(_value)}")
+        for key, value in user_stats.items():
+            print(f"{max_length(key.replace('_', ' ').title(), length)}: {numberize(value)}")
         user_input = input(f"{bot.long_dashes()}\n"
                            f"Enter 1 To View Detailed Stats\n"
                            f"Enter 0 To Go Back\n"
@@ -3648,7 +4129,92 @@ async def display_stats_jail():
 
 
 async def display_stats_other():
-    await bot.not_programmed()
+    async def display_stats(stats_show: str):
+        cls()
+        user_document = await refresh_document_user()
+        length = get_length(list(user_document['data_games']['other'][stats_show].keys()))
+        print(await top_bar(f"{stats_show.title()} Stats"))
+        for key, value in user_document['data_games']['other'][stats_show].items():
+            try:
+                print(f"{max_length(key.replace('_', ' ').title(), length)}: {numberize(value)}")
+            except Exception as _error:
+                await bot.msg_error("display_stats_other", f"Error printing {stats_show} stats", _error)
+                continue
+        input(f"{bot.long_dashes()}\n"
+              f"Hit Enter To Go Back")
+        await bot.go_back()
+
+    while True:
+        cls()
+        options = []
+        user_document = await refresh_document_user()
+        sorted_keys = list(sorted(user_document['data_games']['other'].keys(), key=lambda x: x))
+        length = get_length(len(sorted_keys))
+        print(await top_bar("Other Stats Options"))
+        for n, key in enumerate(sorted_keys, start=1):
+            try:
+                options.append(max_length(f"{n}. {key.title()}", length, n))
+            except Exception as _error:
+                await bot.msg_error("display_stats_other", "Error building options", _error)
+                continue
+        if len(options) > 0:
+            print(nl.join(options))
+        user_input = input(f"{bot.long_dashes()}\n"
+                           f"{f'Enter # Or Name Of Stats To View{nl}' if len(options) > 0 else ''}"
+                           f"Enter 0 To Go Back\n")
+        if user_input.isdigit():
+            user_input = int(user_input)
+            if user_input == 0:
+                await bot.go_back()
+                break
+            elif user_input <= len(options):
+                await display_stats(remove_period_area(options[user_input - 1]).lower())
+            else:
+                await bot.invalid_entry(int)
+        elif user_input.lower() in check_numbered_list(options):
+            await display_stats(user_input.lower())
+        elif user_input in bot.special_commands.values():
+            await special_command(user_input)
+        else:
+            await bot.invalid_entry(str)
+
+
+async def display_stats_pp():
+    async def display_history():
+        cls()
+        user_document = await refresh_document_user()
+        print(await top_bar("PP History"))
+        for i in range(0, len(user_document['data_games']['pp']['history']), bot.length):
+            print(', '.join(user_document['data_games']['pp']['history'][i:i+bot.length]))
+        input(f"Hit Enter To Go Back")
+
+    while True:
+        cls()
+        user_document = await refresh_document_user()
+        print(await top_bar("PP Stats"))
+        dict_print = {
+            "last_checked": user_document['data_games']['pp']['last'],
+            "size": user_document['data_games']['pp']['size']
+        }
+        length = get_length(list(dict_print.keys()))
+        for key, value in dict_print.items():
+            key_form = key.replace('_', ' ').title()
+            print(f"{max_length(f'{key_form}', length)}: {value}")
+        user_input = input(f"Enter 1 To View History\n"
+                           f"Enter 0 To Go Back\n")
+        if user_input.isdigit():
+            user_input = int(user_input)
+            if user_input == 0:
+                await bot.go_back()
+                break
+            elif user_input == 1:
+                await display_history()
+            else:
+                await bot.invalid_entry(int)
+        elif user_input in bot.special_commands.values():
+            await special_command(user_input)
+        else:
+            await bot.invalid_entry(str)
 
 
 async def display_stats_tag():
@@ -3657,11 +4223,12 @@ async def display_stats_tag():
         user_document = await refresh_document_user()
         length = get_length(list(user_document['data_games']['tag'].keys()))
         print(await top_bar("Tag Stats"))
-        try:
-            for _key, _value in user_document['data_games']['tag'].items():
-                print(f"{max_length(_key.title(), length)}: {numberize(_value)}")
-        except Exception as error_printing_tag_stats:
-            await bot.msg_error("display_stats_tag", "Error Printing Tag Stats", error_printing_tag_stats)
+        for key, value in user_document['data_games']['tag'].items():
+            try:
+                print(f"{max_length(key.title(), length)}: {numberize(value)}")
+            except Exception as _error:
+                await bot.msg_error("display_stats_tag", "Error Printing Tag Stats", _error)
+                continue
         user_input = input(f"{bot.long_dashes()}\n"
                            f"Enter 0 To Go Back\n"
                            f"Enter Nothing To Refresh\n")
@@ -3685,26 +4252,26 @@ async def on_message(msg: ChatMessage):
         if msg.text.startswith(("$", "!", "¡")):
             return
         msg.text = msg.text.lower()
-        if msg.user.id != bot.login_details['target_id']:
+        if msg.user.id != bot.channel_details['target_id']:
             if f"{user.display_name.lower()}" in msg.text:
                 await flash_window("attn")
         else:
             if msg.text.startswith(user.display_name.lower()) and "autocast expired" in msg.text:
                 await flash_window("auto_cast_expired")
-    except Exception as error_on_message:
-        await bot.msg_error("on_message", "Generic Error", error_on_message)
+    except Exception as _error:
+        await bot.msg_error("on_message", "Generic Error", _error)
         return
 
 
 async def on_ready(event: EventData):
     try:
-        await event.chat.join_room(bot.login_details['target_name'])
-        logger.info(f"{fortime()}: Connected to {bot.login_details['target_name']} channel\n{bot.long_dashes()}")
-    except Exception as e:
-        await bot.msg_error("on_ready", f"Failed to connect to {bot.login_details['target_name']} channel", e)
+        await event.chat.join_room(bot.channel_details['target_name'])
+        logger.info(f"{fortime()}: Connected to {bot.channel_details['target_name']} channel\n{bot.long_dashes()}")
+    except Exception as _error:
+        await bot.msg_error("on_ready", f"Failed to connect to {bot.channel_details['target_name']} channel", _error)
 
 
-# ----------- Main App Functions -----------
+# ----------- Main Functions -----------
 async def run():
     async def shutdown():
         cls()
@@ -3759,18 +4326,21 @@ async def run():
             print("EXITING")
             await shutdown()
             break
-        except Exception as e:
-            await bot.msg_error("run", "Generic Error", e)
-            await asyncio.sleep(10)
-            await shutdown()
-            break
+        except Exception as _error:
+            await bot.msg_error("run", "Generic Error", _error)
+            try:
+                continue
+            except Exception as _error:
+                await bot.msg_error("run", "Error attempting to continue!", _error)
+                await shutdown()
+                break
 
 
 if __name__ == "__main__":
     init_time = fortime().replace(' ', '--').replace(':', '-')
-    logger = setup_logger("logger", f"main_log--{init_time}.log", logger_list)
-    if None in logger_list:
-        print(f"One of thee loggers isn't setup right\n{nl.join(logger_list)}\nQuitting program")
+    logger = setup_logger("logger", f"main_log--{init_time}.log", log_list)
+    if None in log_list:
+        print(f"One of thee loggers isn't setup right\n{nl.join(log_list)}\nQuitting program")
         time.sleep(10)
     else:
         auth_dict = check_db_auth()
@@ -3809,4 +4379,4 @@ if __name__ == "__main__":
                     else:
                         asyncio.run(bot.invalid_entry(str))
 
-    asyncio.run(log_shutdown(logger_list))
+    shutdown_logger(log_list)
