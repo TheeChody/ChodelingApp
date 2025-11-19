@@ -147,7 +147,7 @@ class BotSetup(Twitch):
                     "view_stats": "!cutline stats"
                 },
                 "fight": {
-                    "fight_chodeling": lambda: f"!fight @{input(f'Enter Username (Without @) Of Chodeling To Fight')}",
+                    "fight_chodeling": lambda: f"!fight @{input(f'Enter Username (Without @) Of Chodeling To Fight{nl}')}",
                     "view_equipped_items": "!fight equipped",
                     "view_stats": "!fight stats"
                 },
@@ -170,7 +170,7 @@ class BotSetup(Twitch):
                     "view_history": "!iq history"
                 },
                 "jail": {
-                    "jail_chodeling": lambda: f"!jail @{input(f'Enter Username (Without @) Of Chodeling To Attempt To Jail')}"
+                    "jail_chodeling": lambda: f"!jail @{input(f'Enter Username (Without @) Of Chodeling To Attempt To Jail{nl}')}"
                 },
                 "kick": {
                     "kick_chodeling": lambda: f"!kick @{input(f'Enter Username (Without @) Of Chodeling To Kick{nl}')}",
@@ -716,21 +716,19 @@ class BotSetup(Twitch):
                      f"{colour('yellow', f'{bot.long_dashes()}')}")
         await asyncio.sleep(5)
 
-    @staticmethod
-    async def msg_no_perm():
+    async def msg_no_perm(self):
         cls()
         print(await top_bar("Permission Error"))
         input(f"{colour('red', 'Required Permissions Not Satisfied!!')}\n"
               "Hit Enter to go back")
-        await bot.go_back()
+        await self.go_back()
 
-    @staticmethod
-    async def not_programmed():
+    async def not_programmed(self):
         cls()
         print(await top_bar("Not Programmed Yet"))
         input(f"{colour('yellow', 'One Day....')} 😝\n"
               "Hit Enter To Go Back")
-        await bot.go_back()
+        await self.go_back()
 
     def set_dashes(self):
         self.length = read_file(self.data_settings['window_length'], int)
@@ -1393,7 +1391,7 @@ async def chodeling_commands():  # ToDo; Build A "Flavourites" Command Category 
                 if len(sig.parameters) == 0:
                     result = command_execute()
                 else:
-                    result = command_execute(sig.parameters.keys())
+                    result = command_execute(sig.parameters.values())
                 if inspect.iscoroutine(result):
                     command_execute = await result
                 else:
@@ -1882,6 +1880,8 @@ async def chodeling_leaderboards():
                     user_input = input(f"Enter 1 To Sort By Total Gambles\n"
                                        f"Enter 2 To Sort By Total Wins\n"
                                        f"Enter 3 To Sort By Total Losses\n"
+                                       f"Enter 4 To Sort By Total Points Change Percent\n"  # ToDo; Add Bet Points Change% Sort
+                                       f"Enter 5 To Sort By Win Percent\n"  # ToDo; Add Bet Win% Sort
                                        f"Enter 0 To Go Back\n")
                     if user_input.isdigit():
                         user_input = int(user_input)
@@ -1897,6 +1897,10 @@ async def chodeling_leaderboards():
                         elif user_input == 3:
                             _dict = await build_gamble_dict("lost")
                             await show_leaderboard("Gamble Losses", dict(sorted(_dict.items(), key=lambda x: x[1][0], reverse=True)))
+                        elif user_input == 4:
+                            await bot.not_programmed()
+                        elif user_input == 5:
+                            await bot.not_programmed()
                         else:
                             await bot.invalid_entry(int)
                     elif user_input in bot.special_commands.values():
@@ -3452,13 +3456,13 @@ async def display_stats_fish():
                 auto_total_cost = numberize(-abs(user_stats['auto']['total_cost']))
                 auto_current_remaining = user_stats['auto']['current_remaining_casts']
                 auto_cast_limit = channel_document['data_games']['fish']['upgrades']['rod'][str(user_stats['levels']['rod'])]['autocast_limit']
-                current_remaining_time = user_stats['auto']['current_remaining_time']
+                time_since_initiated = user_stats['auto']['time_since_initiated']
                 estimated_time_remaining = user_stats['auto']['estimated_time_remaining']
                 dict_print = {
                     "average_cast_time": user_stats['avg_cast_auto_time'] if key_type == "auto" else user_stats['avg_cast_man_time'],
                     "remaining_casts": f"{numberize(auto_current_remaining)}/{auto_cast_limit}" if key_type == "auto" else None,
                     "estimated_time_remaining": estimated_time_remaining if key_type == "auto" else None,
-                    "time_since_initiated": current_remaining_time if key_type == "auto" else None,
+                    "time_since_initiated": time_since_initiated if key_type == "auto" else None,
                     "total_casts": numberize(user_stats[key_type]['total_casts']),
                     "total_cost": f"{auto_total_cost}" if key_type == "auto" else None,
                     "total_gained": numberize(user_stats[key_type]['total_points_gain']),
@@ -3473,7 +3477,8 @@ async def display_stats_fish():
             except Exception as _error:
                 await bot.msg_error("display_stats_fish", f"Error Displaying user_stats for {key_type}", _error)
             user_input = input(f"{bot.long_dashes()}\n"
-                               f"Enter 1 To View Unique Catches List\n"
+                               f"Enter 1 To View Detailed Current Haul\n"  # ToDo; Add Current Haul Info (& ability to view unique catches within haul)
+                               f"Enter 2 To View Unique Catches List\n"
                                f"Enter 0 To Go Back\n"
                                f"Enter Nothing To Refresh\n")
             if user_input == "":
@@ -3484,6 +3489,8 @@ async def display_stats_fish():
                     await bot.go_back()
                     break
                 elif user_input == 1:
+                    await bot.not_programmed()
+                elif user_input == 2:
                     cls()
                     try:
                         if len(user_stats[key_type]['total_unique_dict']) == 0:
@@ -3533,29 +3540,25 @@ async def display_stats_fish():
 
     async def refresh_user_stats() -> dict:
         try:
-            user_document = await refresh_document_user()
-            cast_speed = (bot.variables_channel['upgrades_fish']['lure'][str(user_document['data_games']['fish']['upgrade']['lure'])]['effect'] / 12) + (bot.variables_channel['upgrades_fish']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['effect'] / 12) + (bot.variables_channel['upgrades_fish']['line'][str(user_document['data_games']['fish']['upgrade']['line'])]['effect'] / 12) + bot.variables_channel['upgrades_fish']['reel'][str(user_document['data_games']['fish']['upgrade']['reel'])]['effect']
-            start = max(90 - cast_speed, 30)
-            limit = max(300 - cast_speed, 90)
-            avg_cast_auto_time = (start + limit) / 2
-            avg_cast_man_time = 60
-            total_items = len(channel_document['data_games']['fish']['items'])
-            auto_total_cost = user_document['data_games']['fish']['auto']['cost'] + user_document['data_games']['fish']['totals']['auto']['cost']
-            remaining_auto_cast = user_document['data_games']['fish']['auto']['cast']
-            if remaining_auto_cast > 0:
-                estimated_time_remaining = remaining_auto_cast * avg_cast_auto_time
-            else:
-                estimated_time_remaining = None
-            line_level = user_document['data_games']['fish']['upgrade']['line']
-            lure_level = user_document['data_games']['fish']['upgrade']['lure']
-            reel_level = user_document['data_games']['fish']['upgrade']['reel']
-            rod_level = user_document['data_games']['fish']['upgrade']['rod']
             total_points_auto_add, total_points_auto_loss = 0.0, 0.0
             total_points_man_add, total_points_man_loss = 0.0, 0.0
             total_cast_auto, total_cast_manual = 0, 0
             line_cut, line_cut_total_lost, lines_cut, lines_cut_total_lost = 0, 0.0, 0, 0.0
             total_unique_auto = {}
             total_unique_man = {}
+            user_document = await refresh_document_user()
+            total_items = len(channel_document['data_games']['fish']['items'])
+            remaining_auto_cast = user_document['data_games']['fish']['auto']['cast']
+            auto_total_cost = user_document['data_games']['fish']['auto']['cost'] + user_document['data_games']['fish']['totals']['auto']['cost']
+            cast_speed = (bot.variables_channel['upgrades_fish']['lure'][str(user_document['data_games']['fish']['upgrade']['lure'])]['effect'] / 12) + (bot.variables_channel['upgrades_fish']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['effect'] / 12) + (bot.variables_channel['upgrades_fish']['line'][str(user_document['data_games']['fish']['upgrade']['line'])]['effect'] / 12) + bot.variables_channel['upgrades_fish']['reel'][str(user_document['data_games']['fish']['upgrade']['reel'])]['effect']
+            avg_cast_auto_time = (max(90 - cast_speed, 30) + max(300 - cast_speed, 90)) / 2
+            avg_cast_man_time = 60
+            if remaining_auto_cast > 0:
+                estimated_time_remaining = str(datetime.timedelta(seconds=int(remaining_auto_cast * avg_cast_auto_time))).title()
+                time_since_initiated = str(datetime.timedelta(seconds=int(datetime.datetime.now().timestamp() - user_document['data_games']['fish']['auto']['initiated'].timestamp()))).title()
+            else:
+                estimated_time_remaining = None
+                time_since_initiated = None
             if len(user_document['data_games']['fish']['auto']['catches']) > 0:
                 for key, value in user_document['data_games']['fish']['auto']['catches'].items():
                     if key != "CutLine":
@@ -3606,14 +3609,14 @@ async def display_stats_fish():
                         lines_cut += value2[0]
                         lines_cut_total_lost += value2[1]
             try:
-                dict_return = {
+                _dict = {
                     "avg_cast_auto_time": str(datetime.timedelta(seconds=int(avg_cast_auto_time))).title(),
                     "avg_cast_man_time": str(datetime.timedelta(seconds=int(avg_cast_man_time))).title(),
                     "total_items": total_items,
                     "auto": {
                         "current_remaining_casts": remaining_auto_cast,
-                        "estimated_time_remaining": str(datetime.timedelta(seconds=int(estimated_time_remaining))).title(),
-                        "current_remaining_time": None if remaining_auto_cast == 0 else str(datetime.timedelta(seconds=int(datetime.datetime.now().timestamp() - user_document['data_games']['fish']['auto']['initiated'].timestamp()))).title(),
+                        "estimated_time_remaining": estimated_time_remaining,
+                        "time_since_initiated": time_since_initiated,
                         "total_casts": total_cast_auto,
                         "total_cost": auto_total_cost,
                         "total_points_gain": total_points_auto_add,
@@ -3627,23 +3630,28 @@ async def display_stats_fish():
                         "total_unique_dict": total_unique_man
                     },
                     "levels": {
-                        "line": line_level,
-                        "lure": lure_level,
-                        "reel": reel_level,
-                        "rod": rod_level
+                        "line": user_document['data_games']['fish']['upgrade']['line'],
+                        "lure": user_document['data_games']['fish']['upgrade']['lure'],
+                        "reel": user_document['data_games']['fish']['upgrade']['reel'],
+                        "rod": user_document['data_games']['fish']['upgrade']['rod']
                     },
                     "cut_line": {
                         "own_line_times_cut": line_cut,
                         "own_line_points_lost": line_cut_total_lost,
                         "other_line_times_cut": lines_cut,
                         "other_line_points_lost": lines_cut_total_lost
+                    },
+                    "special": {
+                        "coal": user_document['data_games']['fish']['special']['coal'],
+                        "ice": user_document['data_games']['fish']['special']['ice'],
+                        "lube": user_document['data_games']['fish']['special']['lube']
                     }
                 }
             except Exception as _error:
                 await bot.msg_error("display_stats_fish", "Error Building Return Dictionary", _error)
                 return {}
 
-            return dict_return
+            return _dict
         except Exception as _error:
             await bot.msg_error("display_stats_fish", "Error Building Stats", _error)
             return {}
