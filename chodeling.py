@@ -15,7 +15,7 @@ from decimal import Decimal
 from colorama import Fore, Style
 from twitchAPI.twitch import Twitch, TwitchUser
 from twitchAPI.oauth import UserAuthenticationStorageHelper
-from twitchAPI.chat import Chat, EventData, ChatMessage  #, ChatCommand
+from twitchAPI.chat import Chat, EventData, ChatMessage  # , ChatCommand
 from twitchAPI.type import AuthScope, ChatEvent, TwitchBackendException
 from mongoengine import connect, disconnect_all, DEFAULT_CONNECTION_NAME, Document
 
@@ -82,7 +82,7 @@ class BotSetup(Twitch):
                     "repeat_your_last_message": "!lastcomment"
                 },
                 "lurk": {
-                    "toggle_lurk_status": lambda: self._toggle_lurk()
+                    "toggle_lurk_status": lambda: self.toggle_lurk()
                 },
                 "pointsburn": {
                     "burn_your_points": lambda: f"!pointsburn {input(f'Enter Your Desired Points To Burn (Raw Value){nl}')}"
@@ -124,7 +124,7 @@ class BotSetup(Twitch):
             },
             "mini_games": {
                 "bet": {
-                    "bet": lambda: self._bet(),
+                    "bet": lambda: self.bet(),
                     "check_jackpot": "!bet total",
                     "check_stats": "!bet stats",
                     "double_b": "!bet doubleb"
@@ -153,21 +153,21 @@ class BotSetup(Twitch):
                     "view_stats": "!fight stats"
                 },
                 "fish": {
-                    "auto_cast": lambda: self._fish_auto_cast(int(input(f'Enter Desired Number Of Auto Casts To Purchase{nl}'))),
-                    "auto_cast_top_up": lambda: self._fish_auto_cast(),
-                    "manual_cast": lambda: self._fish_manual_cast(),
-                    "upgrade_line": lambda: self._fish_upgrade('line'),
-                    "upgrade_lure": lambda: self._fish_upgrade('lure'),
-                    "upgrade_reel": lambda: self._fish_upgrade('reel'),
-                    "upgrade_rod": lambda: self._fish_upgrade('rod'),
+                    "auto_cast": lambda: self.fish_auto_cast(int(input(f'Enter Desired Number Of Auto Casts To Purchase{nl}'))),
+                    "auto_cast_top_up": lambda: self.fish_auto_cast(),
+                    "manual_cast": lambda: self.fish_manual_cast(),
+                    "upgrade_line": lambda: self.fish_upgrade('line'),
+                    "upgrade_lure": lambda: self.fish_upgrade('lure'),
+                    "upgrade_reel": lambda: self.fish_upgrade('reel'),
+                    "upgrade_rod": lambda: self.fish_upgrade('rod'),
                     "view_stats": "!fish stats"
                 },
                 "heist": {
-                    "execute_heist": lambda: self._heist_attempt(input(f'Enter Heist Crew # Or Name{nl}')),
+                    "execute_heist": lambda: self.heist_attempt(input(f'Enter Heist Crew # Or Name{nl}')),
                     "view_stats": "!heist stats"
                 },
                 "iq": {
-                    "check_your_iq": lambda: self._check_iq(),
+                    "check_your_iq": lambda: self.check_iq(),
                     "view_history": "!iq history"
                 },
                 "jail": {
@@ -197,7 +197,7 @@ class BotSetup(Twitch):
                     "view_stats": "!pounce stats"
                 },
                 "pp": {
-                    "check_your_pp": lambda: self._check_pp(),
+                    "check_your_pp": lambda: self.check_pp(),
                     "view_history": "!pp history"
                 },
                 "punch": {
@@ -217,7 +217,7 @@ class BotSetup(Twitch):
                     "view_stats": "!tickle stats"
                 },
                 "unoreverse": {
-                    "set_reverse_trigger": lambda: self._set_unoreverse(f"{input(f'Enter Desired New Uno Reverse Action{nl}(cutline | fight | jail){nl}').lower()}")
+                    "set_reverse_trigger": lambda: self.set_uno_reverse(f"{input(f'Enter Desired New Uno Reverse Action{nl}(cutline | fight | jail){nl}').lower()}")
                 },
                 "untag": {
                     "un_tag_yourself": "!untag"
@@ -248,16 +248,16 @@ class BotSetup(Twitch):
             },
             "marathon": {
                 "freepack": {
-                     "redeem_free_pack": lambda: self._free_pack()
+                     "redeem free_pack": lambda: self.free_pack()
                 },
                 "ice": {
-                    "redeem_bucket_of_ice": lambda: self._use_special("ice")
+                    "redeem_bucket_of_ice": lambda: self.use_special("ice")
                 },
                 "loots": {
                     "fetch_latest_coupon_codes": "!loots"
                 },
                 "lube": {
-                    "redeem_bottle_of_lube": lambda: self._use_special("lube")
+                    "redeem_bottle_of_lube": lambda: self.use_special("lube")
                 },
                 "time2add": {
                     "fetch_time_left_to_be_added": "!time2add"
@@ -392,7 +392,7 @@ class BotSetup(Twitch):
             },
             "mods": {
                 "shutdown": {
-                    "shutdown": lambda: self._shutdown()
+                    "shutdown": lambda: self.shutdown()
                 }
             },
             "unlisted": {
@@ -513,7 +513,7 @@ class BotSetup(Twitch):
         self.variables_chodeling = {}
         self.variables = {}
 
-    async def _bet(self) -> list | str:
+    async def bet(self) -> list | str:
         now_time = datetime.datetime.now()
         user_document = await refresh_document_user()
         if user_document['data_games']['gamble']['last'] is None:
@@ -522,7 +522,7 @@ class BotSetup(Twitch):
             return [False, f"Gotta Wait {str(datetime.timedelta(seconds=int(self.const['wait']['bet'] - (now_time.timestamp() - user_document['data_games']['gamble']['last'].timestamp())))).title()}", False]
         return "!bet"
 
-    async def _fish_auto_cast(self, quantity: int = 0) -> list | str:
+    async def fish_auto_cast(self, quantity: int = 0) -> list | str:
         user_document = await refresh_document_user()
         cast_difference = self.variables_channel['upgrades_fish']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit'] - (user_document['data_games']['fish']['auto']['cast'] + quantity)
         if cast_difference > 0:
@@ -531,7 +531,7 @@ class BotSetup(Twitch):
             return [False, "Already At Maximum Auto Casts!!", False]
 
     @staticmethod
-    async def _check_iq():
+    async def check_iq():
         user_document = await refresh_document_user()
         now_time = datetime.datetime.now()
         if user_document['data_games']['iq']['last'] is None:
@@ -543,7 +543,7 @@ class BotSetup(Twitch):
         return "!iq"
 
     @staticmethod
-    async def _check_pp():
+    async def check_pp():
         now_time = datetime.datetime.now()
         user_document = await refresh_document_user()
         if user.id == "627417784":  # Chrispy's ID
@@ -561,7 +561,7 @@ class BotSetup(Twitch):
         return "!pp"
 
     @staticmethod
-    async def _fish_manual_cast() -> list | str:
+    async def fish_manual_cast() -> list | str:
         user_document = await refresh_document_user()
         if user_document['data_games']['fish']['auto']['cast'] != 0:
             return [False, "Already Auto Casting!!", False]
@@ -570,7 +570,7 @@ class BotSetup(Twitch):
         else:
             return "!fish"
 
-    async def _fish_upgrade(self, upgrade_name: str) -> list | str:
+    async def fish_upgrade(self, upgrade_name: str) -> list | str:
         user_document = await refresh_document_user()
         if user_document['data_games']['fish']['upgrade'][upgrade_name] >= len(self.variables_channel['upgrades_fish'].keys()) - 1:
             return [False, f"You're already at thee max {upgrade_name.title()} level; {user_document['data_games']['fish']['upgrade'][upgrade_name]}({self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name])]['name']})!!", False]
@@ -580,7 +580,7 @@ class BotSetup(Twitch):
             return f"!fish upgrade {upgrade_name}"
 
     @staticmethod
-    async def _free_pack() -> list | str:
+    async def free_pack() -> list | str:
         now_time = datetime.datetime.now()
         user_document = await refresh_document_user()
         if user_document['data_user']['dates']['daily_cards'][1] is None:
@@ -589,7 +589,7 @@ class BotSetup(Twitch):
             return [False, f"Gotta Wait {str(datetime.timedelta(seconds=int(bot.const['wait']['free_pack'] - (now_time.timestamp() - user_document['data_user']['dates']['daily_cards'][1].timestamp())))).title()}", False]
         return "!freepack"
 
-    async def _heist_attempt(self, heist_crew: str = None) -> list | str:
+    async def heist_attempt(self, heist_crew: str = None) -> list | str:
         now_time = datetime.datetime.now()
         user_document = await refresh_document_user()
         if user_document['data_games']['heist']['gamble']['last'] is None:
@@ -599,7 +599,7 @@ class BotSetup(Twitch):
         return f"!heist {heist_crew if heist_crew is not None else await fetch_setting('heist')}"
 
     @staticmethod
-    async def _set_unoreverse(new_action: str):
+    async def set_uno_reverse(new_action: str):
         if new_action not in ("cutline", "fight", "jail"):
             return [False, "Invalid Choice!!", False]
         user_document = await refresh_document_user()
@@ -607,23 +607,23 @@ class BotSetup(Twitch):
             return [False, f"You already have {new_action} set as your reverse choice!!", False]
         return f"!unoreverse {new_action}"
 
-    async def _shutdown(self):
+    async def shutdown(self):
         if not self.variables_chodeling['permissions']['mod']:
             return [False, f"You cannot do this! How Thee Fuck Did You Find This? HaHa", False]
         while True:
             cls()
             print(await top_bar("Sanity Check!!"))
-            user_input = input(f"Are you sure you want to attempt shutdown of {self.name}!??\n(Y/N): ").lower()
-            if user_input not in ("y", "yes", "n", "no"):
+            _user_input = input(f"Are you sure you want to attempt shutdown of {self.name}!??\n(Y/N): ").lower()
+            if _user_input not in ("y", "yes", "n", "no"):
                 await self.invalid_entry(str)
             else:
-                if user_input in ("y", "yes"):
+                if _user_input in ("y", "yes"):
                     return "!shutdown"
                 else:
                     return [False, "Alright, moving along. This never happened", False]
 
     @staticmethod
-    async def _toggle_lurk() -> str:
+    async def toggle_lurk() -> str:
         channel_document = await refresh_document_channel()
         if user.id in channel_document['data_lists']['lurk']:
             return "!unlurk"
@@ -631,7 +631,7 @@ class BotSetup(Twitch):
             return "!lurk"
 
     @staticmethod
-    async def _use_special(_type: str):
+    async def use_special(_type: str):
         user_document = await refresh_document_user()
         if user_document['data_games']['fish']['special'][_type] == 0:
             return [False, f"You don't have any {'buckets' if _type == 'ice' else 'bottles'} of {_type} to use!!", False]
@@ -778,10 +778,10 @@ def check_db_auth() -> dict | None:
             time.sleep(15)
             return None
         save_json(stock_json, auth_json, True)
-    auth_dict = read_file(auth_json, {"json": True})
-    if None in (auth_dict['bot_id'], auth_dict['secret_id']):
-        auth_dict = update_auth_json(auth_dict)
-    return auth_dict
+    _auth_dict = read_file(auth_json, {"json": True})
+    if None in (_auth_dict['bot_id'], _auth_dict['secret_id']):
+        _auth_dict = update_auth_json(_auth_dict)
+    return _auth_dict
 
 
 def check_numbered_list(list_check: list) -> list:
@@ -874,17 +874,17 @@ async def fetch_setting(setting: str) -> int | tuple:
 async def flash_window(event_type: str):
     flash_frequency, flash_speed = await fetch_setting("flash")
     if event_type == "attn":
-        colour = "47"
+        _colour = "47"
     elif event_type == "auto_cast_expired":
-        colour = "30"
+        _colour = "30"
     else:
-        colour = "27"
-    os.system(f"color {colour}")
+        _colour = "27"
+    os.system(f"color {_colour}")
     await asyncio.sleep(flash_speed)
     for x in range(1, flash_frequency):
         os.system(f"color 07")
         await asyncio.sleep(flash_speed)
-        os.system(f"color {colour}")
+        os.system(f"color {_colour}")
         await asyncio.sleep(flash_speed)
     os.system(f"color 07")
 
@@ -898,8 +898,8 @@ async def get_auth_user_id() -> TwitchUser | None:
     try:
         async for entry in user_info:
             if type(entry) == TwitchUser:
-                user = entry
-                return user
+                _user = entry
+                return _user
             else:
                 await bot.msg_error("get_auth_user_id", "Generic Error", "NO USER FOUND IN 'user_info'")
                 return None
@@ -962,7 +962,7 @@ def numberize(n: float, decimals: int = 2) -> str:
     1,000,000,000 -> 1B
     1,000,000,000,000 -> 1T
     """
-    def drop_zero(n: Decimal):
+    def drop_zero(_n: Decimal):
         """
         :param: n: number to be numberized
         :return: zero'd number
@@ -971,10 +971,10 @@ def numberize(n: float, decimals: int = 2) -> str:
         For example:
         10.100 -> 10.1
         """
-        n = str(n)
-        return n.rstrip('0').rstrip('.') if '.' in n else n
+        _n = str(_n)
+        return _n.rstrip('0').rstrip('.') if '.' in _n else _n
 
-    def round_num(n: Decimal, decimals: int = 2):
+    def round_num(_n: Decimal, _decimals: int = 2):
         """
         :param: n: number to round
         :param: decimals: number of decimal places to round number
@@ -984,7 +984,7 @@ def numberize(n: float, decimals: int = 2) -> str:
         10.0 -> 10
         10.222 -> 10.22
         """
-        return n.to_integral() if n == n.to_integral() else round(n.normalize(), decimals)
+        return _n.to_integral() if _n == _n.to_integral() else round(_n.normalize(), _decimals)
 
     is_negative_string = ""
     if n < 0:
@@ -1062,8 +1062,8 @@ def numberize(n: float, decimals: int = 2) -> str:
         return is_negative_string + str(n)
 
 
-async def print_status(status: bool, reason: str = "", error: bool = False):
-    if status:
+async def print_status(_status: bool, reason: str = "", error: bool = False):
+    if _status:
         print(colour("green", f"Message Sent To Chat Successfully{f'{nl}{reason}' if reason != '' else ''}"))
     else:
         print_msg = f"{colour('red', 'Message Send Failed')}\n{colour('yellow', reason)}"
@@ -1071,7 +1071,7 @@ async def print_status(status: bool, reason: str = "", error: bool = False):
             await bot.msg_error("special_command", "msg_fail", print_msg)
         else:
             print(print_msg)
-    await asyncio.sleep(2 if status else 10 if error else 3)
+    await asyncio.sleep(2 if _status else 10 if error else 3)
 
 
 def read_file(file_name: str, return_type: type(bool) | type(dict) | type(float) | type(int) | type(list) | type(str)) -> bool | dict | float | int | list | str | None:
@@ -1237,30 +1237,30 @@ async def special_command(key_stroke: str):
     def split_list(_list: list):
         return "", _list[0], _list[1], _list[2]
 
-    msg_send, status, reason, error = "", False, "", False
+    msg_send, _status, reason, error = "", False, "", False
     try:
         if key_stroke == bot.special_commands['bet']:
-            msg_send = await bot._bet()
+            msg_send = await bot.bet()
             if type(msg_send) == list:
-                msg_send, status, reason, error = split_list(msg_send)
+                msg_send, _status, reason, error = split_list(msg_send)
         elif key_stroke == bot.special_commands['bbet']:
             msg_send = "!bet doubleb"
         elif key_stroke == bot.special_commands['fish']:
-            msg_send = await bot._fish_auto_cast()
+            msg_send = await bot.fish_auto_cast()
             if type(msg_send) == list:
-                msg_send, status, reason, error = split_list(msg_send)
+                msg_send, _status, reason, error = split_list(msg_send)
         elif key_stroke == bot.special_commands['fish_beet']:
             msg_send = "!fish beet rod"
         elif key_stroke == bot.special_commands['fish_stroke']:
             msg_send = "!fish stroke rod"
         elif key_stroke == bot.special_commands['free_pack']:
-            msg_send = await bot._free_pack()
+            msg_send = await bot.free_pack()
             if type(msg_send) == list:
-                msg_send, status, reason, error = split_list(msg_send)
+                msg_send, _status, reason, error = split_list(msg_send)
         elif key_stroke == bot.special_commands['heist']:
-            msg_send = await bot._heist_attempt()
+            msg_send = await bot.heist_attempt()
             if type(msg_send) == list:
-                msg_send, status, reason, error = split_list(msg_send)
+                msg_send, _status, reason, error = split_list(msg_send)
         elif key_stroke == bot.special_commands['joints_count_update']:
             if bot.variables_chodeling['permissions']['mod']:
                 msg_send = f"!jointscount update 1"
@@ -1272,10 +1272,10 @@ async def special_command(key_stroke: str):
         else:
             reason = f"{key_stroke} NOT VALID"
         if reason != "" and msg_send == "":
-            await print_status(status, reason, error)
+            await print_status(_status, reason, error)
         else:
-            status, reason, error = await send_chat_msg(msg_send)
-            await print_status(status, reason, error)
+            _status, reason, error = await send_chat_msg(msg_send)
+            await print_status(_status, reason, error)
     except Exception as _error:
         await print_status(False, f"{fortime()}: Error in 'special_command' -- key_stroke; {key_stroke} -- Generic Error\n{_error}", True)
 
@@ -1361,21 +1361,21 @@ async def top_bar(left_side: str) -> str:
 def update_auth_json(current_dict: dict) -> dict:
     while True:
         cls()
-        user_input = input("Enter In Client ID\n")
-        if user_input == "":
+        _user_input = input("Enter In Client ID\n")
+        if _user_input == "":
             asyncio.run(bot.invalid_entry(str))
         else:
-            current_dict['bot_id'] = user_input
+            current_dict['bot_id'] = _user_input
             print(f"Setting '{current_dict['bot_id']}' as thee Client ID")
             time.sleep(2)
             break
     while True:
         cls()
-        user_input = input("Enter In Secret ID\n")
-        if user_input == "":
+        _user_input = input("Enter In Secret ID\n")
+        if _user_input == "":
             asyncio.run(bot.invalid_entry(str))
         else:
-            current_dict['secret_id'] = user_input
+            current_dict['secret_id'] = _user_input
             print(f"Setting '{current_dict['secret_id']}' as thee Secret ID")
             time.sleep(2)
             break
@@ -1397,14 +1397,14 @@ async def chodeling_commands():  # ToDo; Build A "Flavourites" Command Category 
                     command_execute = await result
                 else:
                     command_execute = result
-            except Exception as _error:
-                await bot.msg_error("chodeling_commands", f"Error executing {command_execute}", _error)
+            except Exception as __error:
+                await bot.msg_error("chodeling_commands", f"Error executing {command_execute}", __error)
                 return
         if type(command_execute) == list:
-            status, reason, error = command_execute[0], command_execute[1], command_execute[2]
+            _status, reason, error = command_execute[0], command_execute[1], command_execute[2]
         else:
-            status, reason, error = await send_chat_msg(command_execute)
-        await print_status(status, reason, error)
+            _status, reason, error = await send_chat_msg(command_execute)
+        await print_status(_status, reason, error)
 
     async def show_command_category(command_key: str):
         async def show_command_options(command_name: str):
