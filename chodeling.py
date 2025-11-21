@@ -21,6 +21,7 @@ from mongoengine import connect, disconnect_all, DEFAULT_CONNECTION_NAME, Docume
 
 # ToDo; Add 'upsidedown text to everything' easter egg
 # ToDo; Add stats for time added (also rework chodebot & user documents to keep track & write script to scrape past logs to build data)
+#
 
 if getattr(sys, 'frozen', False):
     folder_name = "Thee ChodelingApp"
