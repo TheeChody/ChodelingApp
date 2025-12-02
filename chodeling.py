@@ -520,7 +520,7 @@ class BotSetup(Twitch):
         user_document = await refresh_document_user()
         now_time = datetime.now(tz=timezone.utc).timestamp()
         if user_document['data_user']['rank']['points'] < self.const['bet']['cost']:
-            return [False, f"You Don't Have Enough Points! Need {numberize(self.const['bet']['cost'])}, you have {numberize(user_document['data_user']['rank']['points'])}!", False]
+            return [False, f"You Don't Have Enough Points!\nNeed {numberize(self.const['bet']['cost'])}, you have {numberize(user_document['data_user']['rank']['points'])}!", False]
         elif user_document['data_games']['gamble']['last'] is None:
             pass
         elif now_time - datetime.astimezone(user_document['data_games']['gamble']['last'], timezone.utc).timestamp() < self.const['bet']['wait']:
