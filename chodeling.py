@@ -7,13 +7,13 @@ import time
 import asyncio
 import inspect
 import logging
-import datetime
 import keyboard
 import threading
 from pathlib import Path
 from decimal import Decimal
 from colorama import Fore, Style
 from twitchAPI.twitch import Twitch, TwitchUser
+from datetime import datetime, timedelta, timezone
 from twitchAPI.oauth import UserAuthenticationStorageHelper
 from twitchAPI.chat import Chat, EventData, ChatMessage  # , ChatCommand
 from twitchAPI.type import AuthScope, ChatEvent, TwitchBackendException
@@ -435,6 +435,10 @@ class BotSetup(Twitch):
             }
         }
         self.const = {
+            "bet": {
+                "cost": 5000,
+                "wait": 600
+            },
             "bingo": {
                 "cost": 10000
             },
@@ -448,7 +452,6 @@ class BotSetup(Twitch):
                 "level": 150
             },
             "wait": {
-                "bet": 600,
                 "free_pack": 28800,
                 "heist": 21600
             }
@@ -514,128 +517,27 @@ class BotSetup(Twitch):
         self.variables = {}
 
     async def bet(self) -> list | str:
-        now_time = datetime.datetime.now()
         user_document = await refresh_document_user()
-        if user_document['data_games']['gamble']['last'] is None:
+        now_time = datetime.now(tz=timezone.utc).timestamp()
+        if user_document['data_user']['points'] < self.const['bet']['cost']:
+            return [False, f"You Don't Have Enough Points! Need {numberize(self.const['bet']['cost'])}!", False]
+        elif user_document['data_games']['gamble']['last'] is None:
             pass
-        elif now_time.timestamp() - user_document['data_games']['gamble']['last'].timestamp() < self.const['wait']['bet']:
-            return [False, f"Gotta Wait {str(datetime.timedelta(seconds=int(self.const['wait']['bet'] - (now_time.timestamp() - user_document['data_games']['gamble']['last'].timestamp())))).title()}", False]
+        elif now_time - datetime.astimezone(user_document['data_games']['gamble']['last'], timezone.utc).timestamp() < self.const['bet']['wait']:
+            return [False, f"Gotta Wait {str(timedelta(seconds=int(self.const['bet']['wait'] - (now_time - datetime.astimezone(user_document['data_games']['gamble']['last'], timezone.utc).timestamp())))).title()}", False]
         return "!bet"
-
-    async def fish_auto_cast(self, quantity: int = 0) -> list | str:
-        user_document = await refresh_document_user()
-        cast_difference = self.variables_channel['upgrades_fish']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit'] - (user_document['data_games']['fish']['auto']['cast'] + quantity)
-        if cast_difference > 0:
-            return f"!fish {cast_difference if user.id != self.variables_channel['bingo_mods']['Free2Escape'] else '6969'}"
-        else:
-            return [False, "Already At Maximum Auto Casts!!", False]
 
     @staticmethod
     async def check_iq():
         user_document = await refresh_document_user()
-        now_time = datetime.datetime.now()
+        now_time = datetime.now(tz=timezone.utc)
         if user_document['data_games']['iq']['last'] is None:
             pass
-        elif now_time.day == user_document['data_games']['iq']['last'].day:
-            if now_time.month == user_document['data_games']['iq']['last'].month:
-                if now_time.year == user_document['data_games']['iq']['last'].year:
+        elif now_time.day == datetime.astimezone(user_document['data_games']['iq']['last'], timezone.utc).day:
+            if now_time.month == datetime.astimezone(user_document['data_games']['iq']['last'], timezone.utc).month:
+                if now_time.year == datetime.astimezone(user_document['data_games']['iq']['last'], timezone.utc).year:
                     return [False, f"You've already checked your IQ for thee day, it's {user_document['data_games']['iq']['current']}.", False]
         return "!iq"
-
-    @staticmethod
-    async def check_pp():
-        now_time = datetime.datetime.now()
-        user_document = await refresh_document_user()
-        if user.id == "627417784":  # Chrispy's ID
-            size = -69
-            user_document['data_games']['pp'] = [size, now_time, ["Always -69 inches depth"]]
-            user_document.save()
-            return [False, f"You are The King of Thee Innie's, as such has Thee Deepest of Deep Innie's at {size} inch innie", False]
-        elif user_document['data_games']['pp']['last'] is None:
-            pass
-        elif now_time.day == user_document['data_games']['pp']['last'].day:
-            if now_time.month == user_document['data_games']['pp']['last'].month:
-                if now_time.year == user_document['data_games']['pp']['last'].year:
-                    size = user_document['data_games']['pp']['size']
-                    return [False, f"You've already checked your pp size today, it's a {f'{size} inch pecker' if size > 0 else f'{size} inch innie'}", False]
-        return "!pp"
-
-    @staticmethod
-    async def fish_manual_cast() -> list | str:
-        user_document = await refresh_document_user()
-        if user_document['data_games']['fish']['auto']['cast'] != 0:
-            return [False, "Already Auto Casting!!", False]
-        elif user_document['data_games']['fish']['line']['cast']:
-            return [False, "You're already casting!! Wait A Few!", False]
-        else:
-            return "!fish"
-
-    async def fish_upgrade(self, upgrade_name: str) -> list | str:
-        user_document = await refresh_document_user()
-        if user_document['data_games']['fish']['upgrade'][upgrade_name] >= len(self.variables_channel['upgrades_fish'].keys()) - 1:
-            return [False, f"You're already at thee max {upgrade_name.title()} level; {user_document['data_games']['fish']['upgrade'][upgrade_name]}({self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name])]['name']})!!", False]
-        elif user_document['data_user']['rank']['points'] < self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name] + 1)]['cost']:
-            return [False, f"You don't have enough points to upgrade your '{upgrade_name.title()}' to {self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name] + 1)]['name']}({user_document['data_games']['fish']['upgrade'][upgrade_name] + 1}) tier, need {numberize(self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name] + 1)]['cost'])} {self.name} Points, but you only have {numberize(user_document['data_user']['rank']['points'])} {self.name} Points!!", False]
-        else:
-            return f"!fish upgrade {upgrade_name}"
-
-    @staticmethod
-    async def free_pack() -> list | str:
-        now_time = datetime.datetime.now()
-        user_document = await refresh_document_user()
-        if user_document['data_user']['dates']['daily_cards'][1] is None:
-            pass
-        elif now_time.timestamp() - user_document['data_user']['dates']['daily_cards'][1].timestamp() < bot.const['wait']['free_pack']:
-            return [False, f"Gotta Wait {str(datetime.timedelta(seconds=int(bot.const['wait']['free_pack'] - (now_time.timestamp() - user_document['data_user']['dates']['daily_cards'][1].timestamp())))).title()}", False]
-        return "!freepack"
-
-    async def heist_attempt(self, heist_crew: str = None) -> list | str:
-        now_time = datetime.datetime.now()
-        user_document = await refresh_document_user()
-        if user_document['data_games']['heist']['gamble']['last'] is None:
-            pass
-        elif now_time.timestamp() - user_document['data_games']['heist']['gamble']['last'].timestamp() < self.const['wait']['heist']:
-            return [False, f"Gotta Wait {str(datetime.timedelta(seconds=int(self.const['wait']['heist'] - (now_time.timestamp() - user_document['data_games']['heist']['gamble']['last'].timestamp())))).title()}", False]
-        return f"!heist {heist_crew if heist_crew is not None else await fetch_setting('heist')}"
-
-    @staticmethod
-    async def set_uno_reverse(new_action: str):
-        if new_action not in ("cutline", "fight", "jail"):
-            return [False, "Invalid Choice!!", False]
-        user_document = await refresh_document_user()
-        if new_action == user_document['data_games']['unoreverse']['command']:
-            return [False, f"You already have {new_action} set as your reverse choice!!", False]
-        return f"!unoreverse {new_action}"
-
-    async def shutdown(self):
-        if not self.variables_chodeling['permissions']['mod']:
-            return [False, f"You cannot do this! How Thee Fuck Did You Find This? HaHa", False]
-        while True:
-            cls()
-            print(await top_bar("Sanity Check!!"))
-            _user_input = input(f"Are you sure you want to attempt shutdown of {self.name}!??\n(Y/N): ").lower()
-            if _user_input not in ("y", "yes", "n", "no"):
-                await self.invalid_entry(str)
-            else:
-                if _user_input in ("y", "yes"):
-                    return "!shutdown"
-                else:
-                    return [False, "Alright, moving along. This never happened", False]
-
-    @staticmethod
-    async def toggle_lurk() -> str:
-        channel_document = await refresh_document_channel()
-        if user.id in channel_document['data_lists']['lurk']:
-            return "!unlurk"
-        else:
-            return "!lurk"
-
-    @staticmethod
-    async def use_special(_type: str):
-        user_document = await refresh_document_user()
-        if user_document['data_games']['fish']['special'][_type] == 0:
-            return [False, f"You don't have any {'buckets' if _type == 'ice' else 'bottles'} of {_type} to use!!", False]
-        return f"!{_type}"
 
     async def check_permissions(self, user_id: str, perm_check: str) -> bool:
         bingo_mods = list(self.variables_channel['bingo_mods'].values())
@@ -654,6 +556,24 @@ class BotSetup(Twitch):
         except Exception as _error:
             await self.msg_error("check_permissions", "Generic Error", _error)
             return False
+
+    @staticmethod
+    async def check_pp():
+        now_time = datetime.now(tz=timezone.utc)
+        user_document = await refresh_document_user()
+        if user.id == "627417784":  # Chrispy's ID
+            size = -69
+            user_document['data_games']['pp'] = [size, now_time, ["Always -69 inches depth"]]
+            user_document.save()
+            return [False, f"You are The King of Thee Innie's, as such has Thee Deepest of Deep Innie's at {size} inch innie", False]
+        elif user_document['data_games']['pp']['last'] is None:
+            pass
+        elif now_time.day == datetime.astimezone(user_document['data_games']['pp']['last'], timezone.utc).day:
+            if now_time.month == datetime.astimezone(user_document['data_games']['pp']['last'], timezone.utc).month:
+                if now_time.year == datetime.astimezone(user_document['data_games']['pp']['last'], timezone.utc).year:
+                    size = user_document['data_games']['pp']['size']
+                    return [False, f"You've already checked your pp size today, it's a {f'{size} inch pecker' if size > 0 else f'{size} inch innie'}", False]
+        return "!pp"
 
     @staticmethod
     async def check_self(chodeling: str, check_type: type(int) | type(str)) -> bool:
@@ -695,10 +615,56 @@ class BotSetup(Twitch):
                 return False
         return True
 
+    async def fish_auto_cast(self, quantity: int = 0) -> list | str:
+        user_document = await refresh_document_user()
+        cast_difference = self.variables_channel['upgrades_fish']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['autocast_limit'] - (user_document['data_games']['fish']['auto']['cast'] + quantity)
+        if cast_difference > 0:
+            return f"!fish {cast_difference if user.id != self.variables_channel['bingo_mods']['Free2Escape'] else '6969'}"
+        else:
+            return [False, "Already At Maximum Auto Casts!!", False]
+
+    @staticmethod
+    async def fish_manual_cast() -> list | str:
+        user_document = await refresh_document_user()
+        if user_document['data_games']['fish']['auto']['cast'] != 0:
+            return [False, "Already Auto Casting!!", False]
+        elif user_document['data_games']['fish']['line']['cast']:
+            return [False, "You're already casting!! Wait A Few!", False]
+        else:
+            return "!fish"
+
+    async def fish_upgrade(self, upgrade_name: str) -> list | str:
+        user_document = await refresh_document_user()
+        if user_document['data_games']['fish']['upgrade'][upgrade_name] >= len(self.variables_channel['upgrades_fish'].keys()) - 1:
+            return [False, f"You're already at thee max {upgrade_name.title()} level; {user_document['data_games']['fish']['upgrade'][upgrade_name]}({self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name])]['name']})!!", False]
+        elif user_document['data_user']['rank']['points'] < self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name] + 1)]['cost']:
+            return [False, f"You don't have enough points to upgrade your '{upgrade_name.title()}' to {self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name] + 1)]['name']}({user_document['data_games']['fish']['upgrade'][upgrade_name] + 1}) tier, need {numberize(self.variables_channel['upgrades_fish'][upgrade_name][str(user_document['data_games']['fish']['upgrade'][upgrade_name] + 1)]['cost'])} {self.name} Points, but you only have {numberize(user_document['data_user']['rank']['points'])} {self.name} Points!!", False]
+        else:
+            return f"!fish upgrade {upgrade_name}"
+
+    @staticmethod
+    async def free_pack() -> list | str:
+        now_time = datetime.now(tz=timezone.utc).timestamp()
+        user_document = await refresh_document_user()
+        if user_document['data_user']['dates']['daily_cards'][1] is None:
+            pass
+        elif now_time - datetime.astimezone(user_document['data_user']['dates']['daily_cards'][1], timezone.utc).timestamp() < bot.const['wait']['free_pack']:
+            return [False, f"Gotta Wait {str(timedelta(seconds=int(bot.const['wait']['free_pack'] - (now_time - datetime.astimezone(user_document['data_user']['dates']['daily_cards'][1], timezone.utc).timestamp())))).title()}", False]
+        return "!freepack"
+
     @staticmethod
     async def go_back(main_menu: bool = False):
         print('Returning to Main Menu' if main_menu else 'Going Back')
         await asyncio.sleep(1)
+
+    async def heist_attempt(self, heist_crew: str = None) -> list | str:
+        now_time = datetime.now(tz=timezone.utc).timestamp()
+        user_document = await refresh_document_user()
+        if user_document['data_games']['heist']['gamble']['last'] is None:
+            pass
+        elif now_time - datetime.astimezone(user_document['data_games']['heist']['gamble']['last'], timezone.utc).timestamp() < self.const['wait']['heist']:
+            return [False, f"Gotta Wait {str(timedelta(seconds=int(self.const['wait']['heist'] - (now_time - datetime.astimezone(user_document['data_games']['heist']['gamble']['last'], timezone.utc).timestamp())))).title()}", False]
+        return f"!heist {heist_crew if heist_crew is not None else await fetch_setting('heist')}"
 
     @staticmethod
     async def invalid_entry(invalid_type: type(str) | type(int)):
@@ -752,12 +718,51 @@ class BotSetup(Twitch):
             if setting not in ("line_dash", "window_length"):
                 self.variables[setting] = read_file(setting_path, str)
 
+    @staticmethod
+    async def set_uno_reverse(new_action: str):
+        if new_action not in ("cutline", "fight", "jail"):
+            return [False, "Invalid Choice!!", False]
+        user_document = await refresh_document_user()
+        if new_action == user_document['data_games']['unoreverse']['command']:
+            return [False, f"You already have {new_action} set as your reverse choice!!", False]
+        return f"!unoreverse {new_action}"
+
+    async def shutdown(self):
+        if not self.variables_chodeling['permissions']['mod']:
+            return [False, f"You cannot do this! How Thee Fuck Did You Find This? HaHa", False]
+        while True:
+            cls()
+            print(await top_bar("Sanity Check!!"))
+            _user_input = input(f"Are you sure you want to attempt shutdown of {self.name}!??\n(Y/N): ").lower()
+            if _user_input not in ("y", "yes", "n", "no"):
+                await self.invalid_entry(str)
+            else:
+                if _user_input in ("y", "yes"):
+                    return "!shutdown"
+                else:
+                    return [False, "Alright, moving along. This never happened", False]
+
+    @staticmethod
+    async def toggle_lurk() -> str:
+        channel_document = await refresh_document_channel()
+        if user.id in channel_document['data_lists']['lurk']:
+            return "!unlurk"
+        else:
+            return "!lurk"
+
+    @staticmethod
+    async def use_special(_type: str):
+        user_document = await refresh_document_user()
+        if user_document['data_games']['fish']['special'][_type] == 0:
+            return [False, f"You don't have any {'buckets' if _type == 'ice' else 'bottles'} of {_type} to use!!", False]
+        return f"!{_type}"
+
 
 # ----------- App Functions -----------
 async def auth_bot():
     twitch_helper = UserAuthenticationStorageHelper(bot, bot.target_scopes, Path(twitch_token))
     await twitch_helper.bind()
-    logger.info(f"{fortime()}: Bot Authenticated Successfully!!\n{bot.long_dashes()}")
+    logger.info(f"{fortime()}: Bot Authenticated Successfully!\n{bot.long_dashes()}")
 
 
 def check_db_auth() -> dict | None:
@@ -890,7 +895,7 @@ async def flash_window(event_type: str):
 
 
 def fortime() -> str:
-    return datetime.datetime.now().strftime('%y-%m-%d %H:%M:%S')
+    return datetime.now().strftime('%y-%m-%d %H:%M:%S')
 
 
 async def get_auth_user_id() -> TwitchUser | None:
@@ -3459,10 +3464,13 @@ async def display_stats_fish():
                 auto_cast_limit = channel_document['data_games']['fish']['upgrades']['rod'][str(user_stats['levels']['rod'])]['autocast_limit']
                 time_since_initiated = user_stats['auto']['time_since_initiated']
                 estimated_time_remaining = user_stats['auto']['estimated_time_remaining']
+                current_time_remaining = user_stats['auto']['current_time_remaining']
                 dict_print = {
-                    "average_cast_time": user_stats['avg_cast_auto_time'] if key_type == "auto" else user_stats['avg_cast_man_time'],
                     "remaining_casts": f"{numberize(auto_current_remaining)}/{auto_cast_limit}" if key_type == "auto" else None,
-                    "estimated_time_remaining": estimated_time_remaining if key_type == "auto" else None,
+                    "average_cast_time": user_stats['avg_auto_cast_time'] if key_type == "auto" else user_stats['avg_man_cast_time'],
+                    "current_cast_time": user_stats['current_cast_time'] if key_type == "auto" else None,
+                    "average_time_remaining": estimated_time_remaining if key_type == "auto" else None,
+                    "current_time_remaining": current_time_remaining if key_type == "auto" else None,
                     "time_since_initiated": time_since_initiated if key_type == "auto" else None,
                     "total_casts": numberize(user_stats[key_type]['total_casts']),
                     "total_cost": f"{auto_total_cost}" if key_type == "auto" else None,
@@ -3543,25 +3551,21 @@ async def display_stats_fish():
         try:
             total_points_auto_add, total_points_auto_loss = 0.0, 0.0
             total_points_man_add, total_points_man_loss = 0.0, 0.0
-            total_cast_auto, total_cast_manual = 0, 0
+            total_cast_auto, current_total_casts, total_cast_manual = 0, 0, 0
             line_cut, line_cut_total_lost, lines_cut, lines_cut_total_lost = 0, 0.0, 0, 0.0
             total_unique_auto = {}
             total_unique_man = {}
             user_document = await refresh_document_user()
+            rod_level = user_document['data_games']['fish']['upgrade']['rod']
             total_items = len(channel_document['data_games']['fish']['items'])
             remaining_auto_cast = user_document['data_games']['fish']['auto']['cast']
             auto_total_cost = user_document['data_games']['fish']['auto']['cost'] + user_document['data_games']['fish']['totals']['auto']['cost']
             cast_speed = (bot.variables_channel['upgrades_fish']['lure'][str(user_document['data_games']['fish']['upgrade']['lure'])]['effect'] / 12) + (bot.variables_channel['upgrades_fish']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['effect'] / 12) + (bot.variables_channel['upgrades_fish']['line'][str(user_document['data_games']['fish']['upgrade']['line'])]['effect'] / 12) + bot.variables_channel['upgrades_fish']['reel'][str(user_document['data_games']['fish']['upgrade']['reel'])]['effect']
-            avg_cast_auto_time = (max(90 - cast_speed, 30) + max(300 - cast_speed, 90)) / 2
-            avg_cast_man_time = 60
-            if remaining_auto_cast > 0:
-                estimated_time_remaining = str(datetime.timedelta(seconds=int(remaining_auto_cast * avg_cast_auto_time))).title()
-                time_since_initiated = str(datetime.timedelta(seconds=int(datetime.datetime.now().timestamp() - user_document['data_games']['fish']['auto']['initiated'].timestamp()))).title()
-            else:
-                estimated_time_remaining = None
-                time_since_initiated = None
+            avg_auto_cast_time = (max(90 - cast_speed, 30) + max(300 - cast_speed, 90)) / 2
+            avg_man_cast_time = 60
             if len(user_document['data_games']['fish']['auto']['catches']) > 0:
                 for key, value in user_document['data_games']['fish']['auto']['catches'].items():
+                    current_total_casts += value[0]
                     if key != "CutLine":
                         total_cast_auto += value[0]
                         if value[1] >= 0:
@@ -3609,14 +3613,32 @@ async def display_stats_fish():
                     for key2, value2 in user_document['data_games']['fish']['totals']['line']['cut_other'][key].items():
                         lines_cut += value2[0]
                         lines_cut_total_lost += value2[1]
+
+            if remaining_auto_cast > 0:
+                time_since_seconds = int(datetime.now(tz=timezone.utc).timestamp() - datetime.astimezone(user_document['data_games']['fish']['auto']['initiated'], timezone.utc).timestamp())
+                estimated_time_remaining = str(timedelta(seconds=int(remaining_auto_cast * avg_auto_cast_time))).title()
+                time_since_initiated = str(timedelta(seconds=time_since_seconds)).title()
+                if current_total_casts > 0:
+                    current_cast_time = time_since_seconds / current_total_casts
+                else:
+                    current_cast_time = avg_auto_cast_time
+                current_time_remaining = str(timedelta(seconds=int(remaining_auto_cast * current_cast_time))).title()
+            else:
+                current_cast_time = avg_auto_cast_time
+                estimated_time_remaining = None
+                current_time_remaining = None
+                time_since_initiated = None
+
             try:
                 _dict = {
-                    "avg_cast_auto_time": str(datetime.timedelta(seconds=int(avg_cast_auto_time))).title(),
-                    "avg_cast_man_time": str(datetime.timedelta(seconds=int(avg_cast_man_time))).title(),
+                    "avg_auto_cast_time": str(timedelta(seconds=int(avg_auto_cast_time))).title(),
+                    "current_cast_time": str(timedelta(seconds=int(current_cast_time))).title(),
+                    "avg_man_cast_time": str(timedelta(seconds=int(avg_man_cast_time))).title(),
                     "total_items": total_items,
                     "auto": {
                         "current_remaining_casts": remaining_auto_cast,
                         "estimated_time_remaining": estimated_time_remaining,
+                        "current_time_remaining": current_time_remaining,
                         "time_since_initiated": time_since_initiated,
                         "total_casts": total_cast_auto,
                         "total_cost": auto_total_cost,
@@ -3634,7 +3656,7 @@ async def display_stats_fish():
                         "line": user_document['data_games']['fish']['upgrade']['line'],
                         "lure": user_document['data_games']['fish']['upgrade']['lure'],
                         "reel": user_document['data_games']['fish']['upgrade']['reel'],
-                        "rod": user_document['data_games']['fish']['upgrade']['rod']
+                        "rod": rod_level
                     },
                     "cut_line": {
                         "own_line_times_cut": line_cut,
