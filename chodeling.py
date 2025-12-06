@@ -163,7 +163,7 @@ class BotSetup(Twitch):
                     "view_stats": "!fish stats"
                 },
                 "heist": {
-                    "execute_heist": lambda: self.heist_attempt(input(f'Enter Heist Crew # Or Name{nl}')),
+                    "execute_heist": lambda: self.heist_attempt(input(f'Enter Heist Crew #{nl}')),
                     "view_stats": "!heist stats"
                 },
                 "iq": {
@@ -446,7 +446,16 @@ class BotSetup(Twitch):
                 "auto_cast_max": 300,
                 "auto_cast_min": 90,
                 "manual_cast_max": 90,
-                "manual_cast_min": 5
+                "manual_cast_min": 5,
+                "orchard_items": (
+                    "a 🍎",
+                    "a 🍏",
+                    "a 🍇",
+                    "a 🍐",
+                    "a 🍒",
+                    "a 🍋",
+                    "a 🌰"
+                )
             },
             "rank": {
                 "level": 150
@@ -498,6 +507,7 @@ class BotSetup(Twitch):
         self.special_commands = {
             "bet": "^B",
             "bbet": "^BB",
+            "chat_message": "^M",
             "fish": "^F",
             "fish_beet": "^RB",
             "fish_stroke": "^RS",
@@ -518,13 +528,13 @@ class BotSetup(Twitch):
 
     async def bet(self) -> list | str:
         user_document = await refresh_document_user()
-        now_time = datetime.now(tz=timezone.utc).timestamp()
+        now_time = datetime.now().timestamp()
         if user_document['data_user']['rank']['points'] < self.const['bet']['cost']:
             return [False, f"You Don't Have Enough Points!\nNeed {numberize(self.const['bet']['cost'])}, you have {numberize(user_document['data_user']['rank']['points'])}!", False]
         elif user_document['data_games']['gamble']['last'] is None:
             pass
-        elif now_time - datetime.astimezone(user_document['data_games']['gamble']['last'], timezone.utc).timestamp() < self.const['bet']['wait']:
-            return [False, f"Gotta Wait {str(timedelta(seconds=int(self.const['bet']['wait'] - (now_time - datetime.astimezone(user_document['data_games']['gamble']['last'], timezone.utc).timestamp())))).title()}", False]
+        elif now_time - user_document['data_games']['gamble']['last'].timestamp() < self.const['bet']['wait']:
+            return [False, f"Gotta Wait {str(timedelta(seconds=int(self.const['bet']['wait'] - (now_time - user_document['data_games']['gamble']['last'].timestamp())))).title()}", False]
         return "!bet"
 
     @staticmethod
@@ -644,12 +654,12 @@ class BotSetup(Twitch):
 
     @staticmethod
     async def free_pack() -> list | str:
-        now_time = datetime.now(tz=timezone.utc).timestamp()
+        now_time = datetime.now().timestamp()
         user_document = await refresh_document_user()
         if user_document['data_user']['dates']['daily_cards'][1] is None:
             pass
-        elif now_time - datetime.astimezone(user_document['data_user']['dates']['daily_cards'][1], timezone.utc).timestamp() < bot.const['wait']['free_pack']:
-            return [False, f"Gotta Wait {str(timedelta(seconds=int(bot.const['wait']['free_pack'] - (now_time - datetime.astimezone(user_document['data_user']['dates']['daily_cards'][1], timezone.utc).timestamp())))).title()}", False]
+        elif now_time - user_document['data_user']['dates']['daily_cards'][1].timestamp() < bot.const['wait']['free_pack']:
+            return [False, f"Gotta Wait {str(timedelta(seconds=int(bot.const['wait']['free_pack'] - (now_time - user_document['data_user']['dates']['daily_cards'][1].timestamp())))).title()}", False]
         return "!freepack"
 
     @staticmethod
@@ -658,13 +668,27 @@ class BotSetup(Twitch):
         await asyncio.sleep(1)
 
     async def heist_attempt(self, heist_crew: str = None) -> list | str:
-        now_time = datetime.now(tz=timezone.utc).timestamp()
+        now_time = datetime.now().timestamp()
         user_document = await refresh_document_user()
-        if user_document['data_games']['heist']['gamble']['last'] is None:
+        if heist_crew is None:
+            heist_crew = await fetch_setting('heist')
+            heist_cost = self.variables_channel['heist']['crews'][str(await fetch_setting('heist'))]['cost']
+        else:
+            crew = int(heist_crew)
+            if crew == 0:
+                pass
+            elif crew > 5:
+                return [False, f"Invalid Entry! {crew} > 5!", False]
+            else:
+                crew -= 1
+            heist_cost = self.variables_channel['heist']['crews'][str(crew)]['cost']
+        if user_document['data_user']['rank']['points'] < heist_cost:
+            return [False, f"Not Enough Points!\nNeed {numberize(heist_cost)}, You Have {numberize(user_document['data_user']['rank']['points'])}", False]
+        elif user_document['data_games']['heist']['gamble']['last'] is None:
             pass
-        elif now_time - datetime.astimezone(user_document['data_games']['heist']['gamble']['last'], timezone.utc).timestamp() < self.const['wait']['heist']:
-            return [False, f"Gotta Wait {str(timedelta(seconds=int(self.const['wait']['heist'] - (now_time - datetime.astimezone(user_document['data_games']['heist']['gamble']['last'], timezone.utc).timestamp())))).title()}", False]
-        return f"!heist {heist_crew if heist_crew is not None else await fetch_setting('heist')}"
+        elif now_time - user_document['data_games']['heist']['gamble']['last'].timestamp() < self.const['wait']['heist']:
+            return [False, f"Gotta Wait {str(timedelta(seconds=int(self.const['wait']['heist'] - (now_time - user_document['data_games']['heist']['gamble']['last'].timestamp())))).title()}", False]
+        return f"!heist {heist_crew}"
 
     @staticmethod
     async def invalid_entry(invalid_type: type(str) | type(int)):
@@ -940,6 +964,7 @@ def hotkey_listen():
         keyboard.add_hotkey("ctrl+shift+f", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish']}\r"))
         keyboard.add_hotkey("ctrl+shift+h", lambda: keyboard.write(f"{clear_code}{bot.special_commands['heist']}\r"))
         keyboard.add_hotkey("ctrl+shift+j", lambda: keyboard.write(f"{clear_code}{bot.special_commands['joints_count_update']}\r"))
+        keyboard.add_hotkey("ctrl+shift+m", lambda: keyboard.write(f"{clear_code}{bot.special_commands['chat_message']}\r"))
         # keyboard.add_hotkey("ctrl+shift+q", lambda: keyboard.write(f"{clear_code}{bot.special_commands['quit']}\r"))
         keyboard.add_hotkey("ctrl+shift+r+b", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish_beet']}\r"))
         keyboard.add_hotkey("ctrl+shift+s+r", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish_stroke']}\r"))
@@ -1174,13 +1199,15 @@ def remove_period_area(var: str) -> str:
         return var
 
 
-def save_json(_dict: dict, file_save: str, first_create: bool = False):
-    if _dict is not None:
-        with open(file_save, "w", encoding="utf-8") as file:
-            json.dump(_dict, file, indent=4, ensure_ascii=False)
-        if first_create:
-            logger.info(f"{fortime()}: First Time Run Detected!!\n'{auth_json}' File Created!")
-            time.sleep(5)
+def save_json(data: dict, file_save: str, first_create: bool = False):
+    if data is None:
+        logger.error(f"{fortime()}: Data is None!!!")
+        return
+    with open(file_save, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=4, ensure_ascii=False)
+    if first_create:
+        logger.info(f"{fortime()}: First Time Run Detected!!\n'{auth_json}' File Created!")
+        time.sleep(5)
 
 
 async def send_chat_msg(msg: str) -> (bool, str, bool):
@@ -1271,6 +1298,8 @@ async def special_command(key_stroke: str):
                 msg_send = f"!jointscount update 1"
             else:
                 reason = "You can't do that!"
+        elif key_stroke == bot.special_commands['chat_message']:
+            msg_send = input(f"Enter Desired Chat Message\n")
         # ToDo; Figure this shit out
         # elif key_stroke == bot.special_commands['quit']:
         #     pass
@@ -3486,8 +3515,8 @@ async def display_stats_fish():
             except Exception as _error:
                 await bot.msg_error("display_stats_fish", f"Error Displaying user_stats for {key_type}", _error)
             user_input = input(f"{bot.long_dashes()}\n"
-                               f"Enter 1 To View Detailed Current Haul\n"  # ToDo; Add Current Haul Info (& ability to view unique catches within haul)
-                               f"Enter 2 To View Unique Catches List\n"
+                               f"Enter 1 To View Unique Catches List\n"
+                               f"{f'Enter 2 To View Detailed Current Haul{nl}' if key_type == 'auto' else ''}"
                                f"Enter 0 To Go Back\n"
                                f"Enter Nothing To Refresh\n")
             if user_input == "":
@@ -3498,18 +3527,28 @@ async def display_stats_fish():
                     await bot.go_back()
                     break
                 elif user_input == 1:
-                    await bot.not_programmed()
-                elif user_input == 2:
                     cls()
+                    print(await top_bar(f"{key_type.title()} Fishing Unique Catches"))
                     try:
                         if len(user_stats[key_type]['total_unique_dict']) == 0:
-                            print(f"You haven't caught anything via {key_type.title()} Casts yet!!")
+                            print(f"You haven't caught anything via {key_type.title()} casts yet!!")
                         else:
-                            print(await top_bar(f"{key_type.title()} Fishing Unique Catches"))
                             await sort_print_list(user_stats[key_type]['total_unique_dict'], 'caught')
                         input(f"{bot.long_dashes()}\nHit Enter To Go Back")
                     except Exception as _error:
-                        await bot.msg_error("display_stats_fish", f"Error Printing {key_type} Catches", _error)
+                        await bot.msg_error("display_stats_fish", f"Error Printing {key_type} Total Catches", _error)
+                        input("\nHit Enter To Go Back")
+                elif user_input == 2 and key_type == "auto":
+                    cls()
+                    print(await top_bar(f"{key_type.title()} Fishing Current Haul"))
+                    try:
+                        if len(user_stats[key_type]['current_unique_dict']) == 0:
+                            print(f"You haven't caught anything via {key_type.title()} casts yet!!")
+                        else:
+                            await sort_print_list(user_stats[key_type]['current_unique_dict'], 'caught')
+                        input(f"{bot.long_dashes()}\nHit Enter To Go Back")
+                    except Exception as _error:
+                        await bot.msg_error("display_stats_fish", f"Error Printing {key_type} Current Haul Catches", _error)
                         input("\nHit Enter To Go Back")
                 else:
                     await bot.invalid_entry(int)
@@ -3518,51 +3557,44 @@ async def display_stats_fish():
             else:
                 await bot.invalid_entry(str)
 
-    async def sort_print_list(_dict: dict, type_: str):
-        sortby = await fetch_setting("sortby")
-        if sortby is not None:
-            left_length = 0
-            right_length = 0
-            length = get_length(len(_dict.keys()))
-            if sortby == 0:
-                for n, (key, value) in enumerate(_dict.items(), start=1):
-                    len_key = len(f"{max_length(f'{n}. ', length, n)}{key}")
-                    len_value = len(f"{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})")
-                    left_length = len_key if len_key > left_length else left_length
-                    right_length = len_value if len_value > right_length else right_length
-            else:
-                for n, value in enumerate(_dict.values(), start=1):
-                    num_order = max_length(f"{n}. ", length, n)
-                    len_value = len(f"{num_order}{numberize(value[0])}") if sortby == 1 else len(f' {num_order}{numberize(value[1])} {numberize(value[1] / value[0])} ')
-                    len_value_right = len(f"Worth {numberize(value[1])} ({f'{numberize(value[1])})' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})") if sortby <= 2 else len(f"{numberize(value[0])} Times ")
-                    left_length = len_value if len_value > left_length else left_length
-                    right_length = len_value_right if len_value_right > right_length else right_length
-            for n, (key, value) in enumerate(dict(sorted(_dict.items(), key=lambda x: x[1 if sortby >= 1 else 0][0 if sortby == 0 else sortby - 1] if sortby <= 2 else x[1][1] / x[1][0])).items(), start=1):
-                if sortby == 0:
-                    print(space(f"Worth {numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", right_length, False, space(f"{max_length(f'{n}. ', length, n)}{key}", left_length, middle_txt=f'{type_.title()} {value[0]} Times')))
-                elif sortby == 1:
-                    print(space(f"Worth {numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[0])}", left_length, middle_txt=key)))
-                elif sortby == 2:
-                    print(space(f'{numberize(value[0])} Times', right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", left_length, middle_txt=key)))
-                else:
-                    print(space(f'{numberize(value[0])} Times', right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", left_length, middle_txt=key)))
+    async def orchard_stats():
+        cls()
+        user_stats = await refresh_user_stats()
+        print(await top_bar("Fish Orchard Stats"))
+        for name, status in user_stats['orchard']['current'].items():
+            print(f"{name} -> {'🟢' if status else '🔴'} (Total: {numberize(user_stats['orchard']['total_caught'][f'a {name}'])})")
+        input(f"{bot.long_dashes()}\nHit Enter To Go Back")
+
+    async def puzzle_stats():
+        cls()
+        user_stats = await refresh_user_stats()
+        length = get_length(list(name for name in user_stats['puzzle']['fish'].keys()))
+        print(await top_bar("Fish Puzzle Stats"))
+        for key, value in user_stats['puzzle']['fish'].items():
+            print(f"{max_length(key.replace('_', ' ').title(), length)}: {value}")
+        input(f"{bot.long_dashes()}\nHit Enter To Go Back")
 
     async def refresh_user_stats() -> dict:
         try:
-            total_points_auto_add, total_points_auto_loss = 0.0, 0.0
-            total_points_man_add, total_points_man_loss = 0.0, 0.0
-            total_cast_auto, current_total_casts, total_cast_manual = 0, 0, 0
-            line_cut, line_cut_total_lost, lines_cut, lines_cut_total_lost = 0, 0.0, 0, 0.0
-            total_unique_auto = {}
             total_unique_man = {}
+            total_unique_auto = {}
+            avg_man_cast_time = 60
+            current_unique_auto = {}
+            line_cut = lines_cut = 0
+            caught_orchard_items = {}
             user_document = await refresh_document_user()
+            line_cut_total_lost = lines_cut_total_lost = 0.0
+            total_points_man_add = total_points_man_loss = 0.0
+            total_points_auto_add = total_points_auto_loss = 0.0
+            total_cast_auto = current_total_casts = total_cast_manual = 0
             rod_level = user_document['data_games']['fish']['upgrade']['rod']
             total_items = len(channel_document['data_games']['fish']['items'])
             remaining_auto_cast = user_document['data_games']['fish']['auto']['cast']
             auto_total_cost = user_document['data_games']['fish']['auto']['cost'] + user_document['data_games']['fish']['totals']['auto']['cost']
+
             cast_speed = (bot.variables_channel['upgrades_fish']['lure'][str(user_document['data_games']['fish']['upgrade']['lure'])]['effect'] / 12) + (bot.variables_channel['upgrades_fish']['rod'][str(user_document['data_games']['fish']['upgrade']['rod'])]['effect'] / 12) + (bot.variables_channel['upgrades_fish']['line'][str(user_document['data_games']['fish']['upgrade']['line'])]['effect'] / 12) + bot.variables_channel['upgrades_fish']['reel'][str(user_document['data_games']['fish']['upgrade']['reel'])]['effect']
             avg_auto_cast_time = (max(90 - cast_speed, 30) + max(300 - cast_speed, 90)) / 2
-            avg_man_cast_time = 60
+
             if len(user_document['data_games']['fish']['auto']['catches']) > 0:
                 for key, value in user_document['data_games']['fish']['auto']['catches'].items():
                     current_total_casts += value[0]
@@ -3572,6 +3604,11 @@ async def display_stats_fish():
                             total_points_auto_add += value[1]
                         else:
                             total_points_auto_loss += value[1]
+                        if key not in current_unique_auto:
+                            current_unique_auto[key] = value
+                        else:
+                            current_unique_auto[key][0] += value[0]
+                            current_unique_auto[key][1] += value[1]
                         if key not in total_unique_auto:
                             total_unique_auto[key] = value
                         else:
@@ -3615,7 +3652,7 @@ async def display_stats_fish():
                         lines_cut_total_lost += value2[1]
 
             if remaining_auto_cast > 0:
-                time_since_seconds = int(datetime.now(tz=timezone.utc).timestamp() - datetime.astimezone(user_document['data_games']['fish']['auto']['initiated'], timezone.utc).timestamp())
+                time_since_seconds = int(datetime.now().timestamp() - user_document['data_games']['fish']['auto']['initiated'].timestamp())
                 estimated_time_remaining = str(timedelta(seconds=int(remaining_auto_cast * avg_auto_cast_time))).title()
                 time_since_initiated = str(timedelta(seconds=time_since_seconds)).title()
                 if current_total_casts > 0:
@@ -3629,6 +3666,14 @@ async def display_stats_fish():
                 current_time_remaining = None
                 time_since_initiated = None
 
+            for name in bot.const['fish']['orchard_items']:
+                total = 0
+                if name in total_unique_auto:
+                    total += total_unique_auto[name][0]
+                if name in total_unique_man:
+                    total += total_unique_man[name][0]
+                caught_orchard_items[name] = total
+
             try:
                 _dict = {
                     "avg_auto_cast_time": str(timedelta(seconds=int(avg_auto_cast_time))).title(),
@@ -3637,8 +3682,9 @@ async def display_stats_fish():
                     "total_items": total_items,
                     "auto": {
                         "current_remaining_casts": remaining_auto_cast,
-                        "estimated_time_remaining": estimated_time_remaining,
                         "current_time_remaining": current_time_remaining,
+                        "current_unique_dict": current_unique_auto,
+                        "estimated_time_remaining": estimated_time_remaining,
                         "time_since_initiated": time_since_initiated,
                         "total_casts": total_cast_auto,
                         "total_cost": auto_total_cost,
@@ -3646,11 +3692,11 @@ async def display_stats_fish():
                         "total_points_lost": total_points_auto_loss,
                         "total_unique_dict": total_unique_auto
                     },
-                    "manual": {
-                        "total_casts": total_cast_manual,
-                        "total_points_gain": total_points_man_add,
-                        "total_points_lost": total_points_man_loss,
-                        "total_unique_dict": total_unique_man
+                    "cut_line": {
+                        "own_line_times_cut": line_cut,
+                        "own_line_points_lost": line_cut_total_lost,
+                        "other_line_times_cut": lines_cut,
+                        "other_line_points_lost": lines_cut_total_lost
                     },
                     "levels": {
                         "line": user_document['data_games']['fish']['upgrade']['line'],
@@ -3658,11 +3704,18 @@ async def display_stats_fish():
                         "reel": user_document['data_games']['fish']['upgrade']['reel'],
                         "rod": rod_level
                     },
-                    "cut_line": {
-                        "own_line_times_cut": line_cut,
-                        "own_line_points_lost": line_cut_total_lost,
-                        "other_line_times_cut": lines_cut,
-                        "other_line_points_lost": lines_cut_total_lost
+                    "manual": {
+                        "total_casts": total_cast_manual,
+                        "total_points_gain": total_points_man_add,
+                        "total_points_lost": total_points_man_loss,
+                        "total_unique_dict": total_unique_man
+                    },
+                    "orchard": {
+                        "current": user_document['data_games']['fish']['orchard'],
+                        "total_caught": caught_orchard_items
+                    },
+                    "puzzle": {
+                        "fish": user_document['data_games']['puzzle']['fish']
                     },
                     "special": {
                         "coal": user_document['data_games']['fish']['special']['coal'],
@@ -3678,6 +3731,35 @@ async def display_stats_fish():
         except Exception as _error:
             await bot.msg_error("display_stats_fish", "Error Building Stats", _error)
             return {}
+
+    async def sort_print_list(_dict: dict, type_: str):
+        sortby = await fetch_setting("sortby")
+        if sortby is not None:
+            left_length = 0
+            right_length = 0
+            length = get_length(len(_dict.keys()))
+            if sortby == 0:
+                for n, (key, value) in enumerate(_dict.items(), start=1):
+                    len_key = len(f"{max_length(f'{n}. ', length, n)}{key}")
+                    len_value = len(f"{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})")
+                    left_length = len_key if len_key > left_length else left_length
+                    right_length = len_value if len_value > right_length else right_length
+            else:
+                for n, value in enumerate(_dict.values(), start=1):
+                    num_order = max_length(f"{n}. ", length, n)
+                    len_value = len(f"{num_order}{numberize(value[0])}") if sortby == 1 else len(f' {num_order}{numberize(value[1])} {numberize(value[1] / value[0])} ')
+                    len_value_right = len(f"Worth {numberize(value[1])} ({f'{numberize(value[1])})' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})") if sortby <= 2 else len(f"{numberize(value[0])} Times ")
+                    left_length = len_value if len_value > left_length else left_length
+                    right_length = len_value_right if len_value_right > right_length else right_length
+            for n, (key, value) in enumerate(dict(sorted(_dict.items(), key=lambda x: x[1 if sortby >= 1 else 0][0 if sortby == 0 else sortby - 1] if sortby <= 2 else x[1][1] / x[1][0])).items(), start=1):
+                if sortby == 0:
+                    print(space(f"Worth {numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", right_length, False, space(f"{max_length(f'{n}. ', length, n)}{key}", left_length, middle_txt=f'{type_.title()} {value[0]} Times')))
+                elif sortby == 1:
+                    print(space(f"Worth {numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[0])}", left_length, middle_txt=key)))
+                elif sortby == 2:
+                    print(space(f'{numberize(value[0])} Times', right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", left_length, middle_txt=key)))
+                else:
+                    print(space(f'{numberize(value[0])} Times', right_length, False, space(f"{max_length(f'{n}. ', length, n)}{numberize(value[1])} ({f'{numberize(value[1])}' if -1 <= value[0] <= 1 else f'{numberize(value[1] / value[0])}'})", left_length, middle_txt=key)))
 
     def space(item: str, line_length: int, left: bool = True, left_item: str = "", middle_txt: str = ""):
         if left:
@@ -3752,7 +3834,9 @@ async def display_stats_fish():
         user_input = input("Enter 1 To View Auto Stats\n"
                            "Enter 2 To View Manual Stats\n"
                            "Enter 3 To View Line Cut Stats\n"
-                           "Enter 4 To View Upgrades Details\n"
+                           "Enter 4 To View Orchard Stats\n"
+                           "Enter 5 To View Puzzle Stats\n"
+                           "Enter 6 To View Upgrades Details\n"
                            "Enter 0 To Go Back\n")
         if user_input.isdigit():
             user_input = int(user_input)
@@ -3766,6 +3850,10 @@ async def display_stats_fish():
             elif user_input == 3:
                 await cutline_stats()
             elif user_input == 4:
+                await orchard_stats()
+            elif user_input == 5:
+                await puzzle_stats()
+            elif user_input == 6:
                 await upgrade_stats()
             else:
                 await bot.invalid_entry(int)
