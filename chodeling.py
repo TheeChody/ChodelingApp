@@ -51,6 +51,8 @@ Path(directories['logs_archive']).mkdir(parents=True, exist_ok=True)
 nl = "\n"
 log_list = []
 auth_json = f"{directories['auth']}auth_info.json"
+new_auth = f"{directories['auth']}new_auth_string.txt"
+old_auth = f"{directories['auth']}chodeling_string.txt"
 twitch_token = f"{directories['auth']}twitch_token.json"
 chodeling_string = f"{directories['auth']}chodeling_string.txt"
 
@@ -810,6 +812,22 @@ def check_db_auth() -> dict | None:
     _auth_dict = read_file(auth_json, {"json": True})
     if None in (_auth_dict['bot_id'], _auth_dict['secret_id']):
         _auth_dict = update_auth_json(_auth_dict)
+    return _auth_dict
+
+
+def check_new_db(_auth_dict: dict) -> dict:
+    if os.path.exists(new_auth):
+        _auth_dict['db_string'] = read_file(new_auth, str)
+        save_json(_auth_dict, auth_json, False)
+        try:
+            with open(old_auth, "w") as file:
+                file.write(read_file(new_auth, str))
+        except Exception as e:
+            asyncio.run(bot.msg_error("check_new_db", f"Error Writing {old_auth} with {new_auth} data", e))
+        try:
+            os.remove(new_auth)
+        except Exception as e:
+            asyncio.run(bot.msg_error("check_new_db", f"Error Deleting {new_auth}", e))
     return _auth_dict
 
 
@@ -2583,7 +2601,7 @@ async def display_stats_bingo():
                     cls()
                     options = []
                     length = get_length(len(channel_document['data_games']['bingo']['modes'].keys()))
-                    for n, game_type in enumerate(channel_document['data_games']['bingo']['modes'].keys(), start=1):
+                    for n, game_type in enumerate(sorted(channel_document['data_games']['bingo']['modes'].keys(), key=lambda x: x), start=1):
                         options.append(max_length(f"{n}. {game_type}", length, n))
                     print(await top_bar("Bingo Game Type Options"))
                     user_input = input(f"{f'{nl.join(options)}{nl}' if len(options) > 0 else ''}"
@@ -4464,6 +4482,7 @@ if __name__ == "__main__":
     else:
         auth_dict = check_db_auth()
         if auth_dict is not None:
+            check_new_db(auth_dict)
             bot = BotSetup(auth_dict['bot_id'], auth_dict['secret_id'])
             status = bot.data_check()
             if status:
