@@ -9,9 +9,11 @@ import inspect
 import logging
 import keyboard
 import threading
+import subprocess
 from pathlib import Path
 from decimal import Decimal
-from colorama import Fore, Style
+from colorama import Fore, Style, Back
+from typing import Literal, overload
 from twitchAPI.twitch import Twitch, TwitchUser
 from datetime import datetime, timedelta, timezone
 from twitchAPI.oauth import UserAuthenticationStorageHelper
@@ -23,38 +25,54 @@ from mongoengine import connect, disconnect_all, DEFAULT_CONNECTION_NAME, Docume
 # ToDo; Add stats for time added (also rework chodebot & user documents to keep track & write script to scrape past logs to build data)
 
 
-if getattr(sys, 'frozen', False):
-    folder_name = "Thee ChodelingApp"
-    if sys.platform == "win32":
-        from ctypes import windll, create_unicode_buffer
-        buf = create_unicode_buffer(260)
-        if windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf) == 0:
-            data_path = f"{Path(buf.value)}\\{folder_name}\\"
+def get_data_path() -> Path:
+    FOLDER_NAME = "Thee ChodelingApp"
+    if getattr(sys, 'frozen', False):
+        if sys.platform == "win32":
+            try:
+                from ctypes import windll, create_unicode_buffer
+                buf = create_unicode_buffer(260)
+                # noinspection PyUnresolvedReferences
+                if windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf) == 0:
+                    base = Path(buf.value)
+                else:
+                    base = Path(os.environ["USERPROFILE"]) / "Documents"
+            except Exception as e:
+                temp_path = Path(__file__).parent
+                temp_filename = "pathing_error.txt"
+                temp_together = Path.joinpath(temp_path, temp_filename)
+                pause_time = 20
+                with open(temp_together, "w", encoding="utf-8") as f:
+                    f.write(f"Error in 'get_data_path' -- {e}")
+                print(f"ERROR IN PATH_SETUP -> SEE '{temp_together}' FOR DETAILS!!\n\nAttempting to continue in {pause_time} seconds")
+                time.sleep(pause_time)
+                base = Path(os.environ["USERPROFILE"]) / "Documents"
         else:
-            data_path = f"{Path(os.environ['USERPROFILE']) / 'Documents'}\\{folder_name}\\"
+            base = Path.home() / "Documents"
+        return base / FOLDER_NAME
     else:
-        data_path = f"{Path.home() / 'Documents'}\\{folder_name}\\"
-else:
-    data_path = f"{os.path.dirname(__file__)}\\"
+        return Path(__file__).parent
+
+
+data_path = get_data_path()
 
 directories = {
-    "auth": f"{data_path}auth\\",
-    "data": f"{data_path}data\\",
-    "logs": f"{data_path}logs\\",
-    "logs_archive": f"{data_path}logs\\archive_log\\"
+    "auth": data_path / "auth",
+    "data": data_path / "data",
+    "logs": data_path / "logs",
+    "logs_archive": data_path / "logs" / "archive_log"
 }
-Path(directories['auth']).mkdir(parents=True, exist_ok=True)
-Path(directories['data']).mkdir(parents=True, exist_ok=True)
-Path(directories['logs']).mkdir(parents=True, exist_ok=True)
-Path(directories['logs_archive']).mkdir(parents=True, exist_ok=True)
+
+for _dir in directories.values():
+    Path(_dir).mkdir(parents=True, exist_ok=True)
 
 nl = "\n"
 log_list = []
-auth_json = f"{directories['auth']}auth_info.json"
-new_auth = f"{directories['auth']}new_auth_string.txt"
-old_auth = f"{directories['auth']}chodeling_string.txt"
-twitch_token = f"{directories['auth']}twitch_token.json"
-chodeling_string = f"{directories['auth']}chodeling_string.txt"
+auth_json = directories['auth'] / "auth_info.json"
+new_auth = directories['auth'] / "new_auth_string.txt"
+old_auth = directories['auth'] / "chodeling_string.txt"
+twitch_token = directories['auth'] / "twitch_token.json"
+chodeling_string = directories['auth'] / "chodeling_string.txt"
 
 
 class BotSetup(Twitch):
@@ -354,9 +372,6 @@ class BotSetup(Twitch):
                 "maylore": {
                     "maylore": "!lore"
                 },
-                "moony": {
-                    "moony": "!moony"
-                },
                 "mullens": {
                     "mull": "!mull",
                     "mullens": "!mullens"
@@ -366,9 +381,6 @@ class BotSetup(Twitch):
                 },
                 "queenpenguin": {
                     "queenpenguin": "!queenpenguin"
-                },
-                "ronin": {
-                    "ronin": "!ronin"
                 },
                 "rubi": {
                     "rubi": "!rubi"
@@ -460,7 +472,7 @@ class BotSetup(Twitch):
                 )
             },
             "rank": {
-                "level": 150
+                "level": 500
             },
             "wait": {
                 "free_pack": 28800,
@@ -588,7 +600,7 @@ class BotSetup(Twitch):
         return "!pp"
 
     @staticmethod
-    async def check_self(chodeling: str, check_type: type(int) | type(str)) -> bool:
+    async def check_self(chodeling: str, check_type) -> bool:
         async def msg():
             print("Can't choose yourself!!")
             await asyncio.sleep(3)
@@ -693,7 +705,7 @@ class BotSetup(Twitch):
         return f"!heist {heist_crew}"
 
     @staticmethod
-    async def invalid_entry(invalid_type: type(str) | type(int)):
+    async def invalid_entry(invalid_type):
         print(f"{colour('red', 'Invalid')} {colour('yellow', 'Number' if invalid_type == int else 'Text')} {colour('red', 'entry, try again')}")
         await asyncio.sleep(2)
 
@@ -701,7 +713,7 @@ class BotSetup(Twitch):
         return f"{self.line_dash * self.length}"
 
     @staticmethod
-    async def msg_error(function_name: str, error_type: any, error_str: any):
+    async def msg_error(function_name: str, error_type, error_str):
         logger.error(f"{colour('yellow', f'{bot.long_dashes()}')}\n"
                      f"{colour('red', f'{fortime()}: Error in {function_name}')}\n"
                      f"{colour('yellow', f'{error_type}')}\n"
@@ -784,6 +796,42 @@ class BotSetup(Twitch):
         return f"!{_type}"
 
 
+class DictOptions:
+    __slots__ = ("json",)
+
+    def __init__(self, json: bool = False):
+        self.json = json
+
+
+class ListOptions:
+    __slots__ = ("mode", "sep", "maxsplit", "cast_map")
+
+    def __init__(self,
+        mode: Literal["split", "splitlines", "none"] = "none",
+        sep: str = "",
+        maxsplit: int = -1,
+        cast_map: bool = False,
+    ):
+        self.mode = mode
+        self.sep = sep
+        self.maxsplit = maxsplit
+        self.cast_map = cast_map
+
+
+@overload
+def read_file(file_name: Path | str, return_type: type[bool]) -> bool | str: ...
+@overload
+def read_file(file_name: Path | str, return_type: type[dict] | DictOptions) -> dict: ...
+@overload
+def read_file(file_name: Path | str, return_type: type[float]) -> float: ...
+@overload
+def read_file(file_name: Path | str, return_type: type[int]) -> int: ...
+@overload
+def read_file(file_name: Path | str, return_type: type[list] | ListOptions) -> list: ...
+@overload
+def read_file(file_name: Path | str, return_type: type[str]) -> str: ...
+
+
 # ----------- App Functions -----------
 async def auth_bot():
     twitch_helper = UserAuthenticationStorageHelper(bot, bot.target_scopes, Path(twitch_token))
@@ -809,7 +857,7 @@ def check_db_auth() -> dict | None:
             time.sleep(15)
             return None
         save_json(stock_json, auth_json, True)
-    _auth_dict = read_file(auth_json, {"json": True})
+    _auth_dict = read_file(auth_json, DictOptions(json=True))
     if None in (_auth_dict['bot_id'], _auth_dict['secret_id']):
         _auth_dict = update_auth_json(_auth_dict)
     return _auth_dict
@@ -849,8 +897,8 @@ def check_numbered_list(list_check: list) -> list:
     return new_list
 
 
-def cls():
-    os.system('cls' if os.name == 'nt' else 'clear')
+def cls() -> None:
+    subprocess.run(['cls' if os.name == 'nt' else 'clear'], shell=(os.name == 'nt'))
 
 
 def colour(_colour: str, str_: str) -> str:
@@ -920,20 +968,22 @@ async def fetch_setting(setting: str) -> int | tuple:
 
 async def flash_window(event_type: str):
     flash_frequency, flash_speed = await fetch_setting("flash")
+    colour_def = Back.BLACK
     if event_type == "attn":
-        _colour = "47"
+        _colour = Back.RED
     elif event_type == "auto_cast_expired":
-        _colour = "30"
+        _colour = Back.CYAN
     else:
-        _colour = "27"
-    os.system(f"color {_colour}")
+        _colour = Back.MAGENTA
+    # os.system(f"color {_colour}")
+    print(_colour, end='', flush=True)
     await asyncio.sleep(flash_speed)
     for x in range(1, flash_frequency):
-        os.system(f"color 07")
+        print(colour_def, end='', flush=True)
         await asyncio.sleep(flash_speed)
-        os.system(f"color {_colour}")
+        print(_colour, end='', flush=True)
         await asyncio.sleep(flash_speed)
-    os.system(f"color 07")
+    print(colour_def, end='', flush=True)
 
 
 def fortime() -> str:
@@ -1122,54 +1172,58 @@ async def print_status(_status: bool, reason: str = "", error: bool = False):
     await asyncio.sleep(2 if _status else 10 if error else 3)
 
 
-def read_file(file_name: str, return_type: type(bool) | type(dict) | type(float) | type(int) | type(list) | type(str)) -> bool | dict | float | int | list | str | None:
-    def open_file(json_: bool = False):
+def read_file(file_name: Path | str, return_type: type[bool | dict | float | int | list | str] | ListOptions | DictOptions):
+
+    def open_file(json_: bool = False) -> str | dict:
         with open(file_name, "r", encoding="utf-8") as file:
-            if json_:
-                return json.load(file)
-            else:
-                return file.read()
+            return json.load(file) if json_ else file.read()
 
     try:
-        if return_type == bool:
-            variable = open_file()
-            if variable == "True":
+        # --- bool ---
+        if return_type is bool:
+            raw = open_file()
+            if raw == "True":
                 return True
-            elif variable == "False":
+            elif raw == "False":
                 return False
+            return f"ValueError Converting {raw!r} to {return_type}"
+
+        # --- dict (with options) ---
+        if isinstance(return_type, DictOptions):
+            return open_file(return_type.json)  # type: ignore[return-value]
+        if return_type is dict:
+            return dict(open_file())  # type: ignore[call-overload]
+
+        # --- list (with options) ---
+        if isinstance(return_type, ListOptions):
+            raw = open_file()
+            assert isinstance(raw, str)
+            raw = open_file()
+            assert isinstance(raw, str)
+            if return_type.mode == "split":
+                parts = raw.split(return_type.sep, maxsplit=return_type.maxsplit)
+            elif return_type.mode == "splitlines":
+                parts = raw.splitlines()
             else:
-                return f"ValueError Converting {variable} to {return_type}"
-        elif type(return_type) == dict:
-            if return_type['json']:
-                return open_file(True)
-            else:
-                return dict(open_file())
-        elif return_type == dict:
-            return dict(open_file())
-        elif type(return_type) == list:
-            variable = open_file()
-            if return_type[1] == "split":
-                variable = variable.split(return_type[2], maxsplit=return_type[3])
-            elif return_type[1] == "splitlines":
-                variable = variable.splitlines()
-            if return_type[0] == map:
-                return list(map(str, variable))
-            else:
-                return list(variable)
-        elif return_type in (int, float):
-            variable = float(open_file())
-            if return_type == float:
-                return variable
-            return int(variable)
-        else:
-            return open_file()
+                parts = list(raw)
+            return list(map(str, parts)) if return_type.cast_map else parts
+        if return_type is list:
+            return list(open_file())
+
+        if return_type is int:
+            return int(float(open_file()))  # type: ignore[arg-type]
+        if return_type is float:
+            return float(open_file())       # type: ignore[arg-type]
+
+        return open_file()  # type: ignore[return-value]
+
     except FileNotFoundError:
         logger.error(f"{fortime()}: {file_name} Doesn't Exist!")
         time.sleep(5)
         return None
     except ValueError:
-        variable = open_file()
-        return f"ValueError Converting {variable} (type; {type(variable)}) to {return_type}"
+        raw = open_file()
+        return f"ValueError Converting {raw!r} (type: {type(raw)}) to {return_type}"
     except Exception as _error:
         error_msg = f"{fortime()}: Error in 'read_file' -- Generic Error -- {_error}"
         logger.error(error_msg)
@@ -1228,7 +1282,7 @@ def save_json(data: dict, file_save: str, first_create: bool = False):
         time.sleep(5)
 
 
-async def send_chat_msg(msg: str) -> (bool, str, bool):
+async def send_chat_msg(msg: str):
     try:
         await bot.send_chat_message(bot.channel_details['target_id'], user.id, msg)
         return True, "", False
