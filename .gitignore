@@ -1,6 +1,10 @@
 /.idea/
 /logs/
 /auth/
+/build/
 /data/
+/dist/
+/chodeling_string.txt
+/ChodelingApp.spec
 /release_notes.txt
 /new_auth_string.txt

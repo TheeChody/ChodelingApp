@@ -75,6 +75,7 @@ twitch_token = directories['auth'] / "twitch_token.json"
 chodeling_string = directories['auth'] / "chodeling_string.txt"
 
 
+# ----------- Class Setup -----------
 class BotSetup(Twitch):
     def __init__(self, app_id: str, app_secret: str):
         super().__init__(app_id, app_secret)
@@ -468,7 +469,8 @@ class BotSetup(Twitch):
                     "a 🍐",
                     "a 🍒",
                     "a 🍋",
-                    "a 🌰"
+                    "a 🍑",
+                    "a 🍓",
                 )
             },
             "rank": {
@@ -480,14 +482,14 @@ class BotSetup(Twitch):
             }
         }
         self.data_settings = {
-            "flash": f"{directories['data']}flash.txt",
-            "line_dash": f"{directories['data']}line_separator.txt",
-            "types_always_display": f"{directories['data']}types_always_display.txt",
-            "types_heist": f"{directories['data']}types_heist.txt",
-            "types_sort": f"{directories['data']}types_sort.txt",
-            "types_xp_display": f"{directories['data']}types_xp_display.txt",
-            "window_length": f"{directories['data']}window_length.txt",
-            "xp_bar_key": f"{directories['data']}xp_bar_key.txt"
+            "flash": directories['data'] / "flash.txt",
+            "line_dash": directories['data'] / "line_separator.txt",
+            "types_always_display": directories['data'] / "types_always_display.txt",
+            "types_heist": directories['data'] / "types_heist.txt",
+            "types_sort": directories['data'] / "types_sort.txt",
+            "types_xp_display": directories['data'] / "types_xp_display.txt",
+            "window_length": directories['data'] / "window_length.txt",
+            "xp_bar_key": directories['data'] / "xp_bar_key.txt"
         }
         self.length = 100
         self.line_dash = "-"
@@ -523,7 +525,7 @@ class BotSetup(Twitch):
             "bbet": "^BB",
             "chat_message": "^M",
             "fish": "^F",
-            "fish_beet": "^RB",
+            "fish_beat": "^RB",
             "fish_stroke": "^RS",
             "free_pack": "^C",
             "heist": "^H",
@@ -818,6 +820,7 @@ class ListOptions:
         self.cast_map = cast_map
 
 
+# ----------- Overloads -----------
 @overload
 def read_file(file_name: Path | str, return_type: type[bool]) -> bool | str: ...
 @overload
@@ -832,7 +835,7 @@ def read_file(file_name: Path | str, return_type: type[list] | ListOptions) -> l
 def read_file(file_name: Path | str, return_type: type[str]) -> str: ...
 
 
-# ----------- App Functions -----------
+# ----------- General Functions -----------
 async def auth_bot():
     twitch_helper = UserAuthenticationStorageHelper(bot, bot.target_scopes, Path(twitch_token))
     await twitch_helper.bind()
@@ -1034,7 +1037,7 @@ def hotkey_listen():
         keyboard.add_hotkey("ctrl+shift+j", lambda: keyboard.write(f"{clear_code}{bot.special_commands['joints_count_update']}\r"))
         keyboard.add_hotkey("ctrl+shift+m", lambda: keyboard.write(f"{clear_code}{bot.special_commands['chat_message']}\r"))
         # keyboard.add_hotkey("ctrl+shift+q", lambda: keyboard.write(f"{clear_code}{bot.special_commands['quit']}\r"))
-        keyboard.add_hotkey("ctrl+shift+r+b", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish_beet']}\r"))
+        keyboard.add_hotkey("ctrl+shift+r+b", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish_beat']}\r"))
         keyboard.add_hotkey("ctrl+shift+s+r", lambda: keyboard.write(f"{clear_code}{bot.special_commands['fish_stroke']}\r"))
         keyboard.wait()
     except Exception as _error:
@@ -1176,7 +1179,7 @@ def read_file(file_name: Path | str, return_type: type[bool | dict | float | int
 
     def open_file(json_: bool = False) -> str | dict:
         with open(file_name, "r", encoding="utf-8") as file:
-            return json.load(file) if json_ else file.read()
+            return json.load(file) if json_ else file.read().strip()
 
     try:
         # --- bool ---
@@ -1190,9 +1193,9 @@ def read_file(file_name: Path | str, return_type: type[bool | dict | float | int
 
         # --- dict (with options) ---
         if isinstance(return_type, DictOptions):
-            return open_file(return_type.json)  # type: ignore[return-value]
+            return open_file(return_type.json)
         if return_type is dict:
-            return dict(open_file())  # type: ignore[call-overload]
+            return dict(open_file())
 
         # --- list (with options) ---
         if isinstance(return_type, ListOptions):
@@ -1211,11 +1214,11 @@ def read_file(file_name: Path | str, return_type: type[bool | dict | float | int
             return list(open_file())
 
         if return_type is int:
-            return int(float(open_file()))  # type: ignore[arg-type]
+            return int(float(open_file()))
         if return_type is float:
-            return float(open_file())       # type: ignore[arg-type]
+            return float(open_file())
 
-        return open_file()  # type: ignore[return-value]
+        return open_file()
 
     except FileNotFoundError:
         logger.error(f"{fortime()}: {file_name} Doesn't Exist!")
@@ -1301,7 +1304,7 @@ def shutdown_logger(_log_list: list):
     logging.shutdown()
     for entry in _log_list:
         try:
-            os.rename(f"{directories['logs']}{entry}", f"{directories['logs_archive']}{entry}")
+            os.rename(directories['logs'] / entry, directories['logs_archive'] / entry)
             print(f"{entry} moved to archives..")
         except Exception as _error:
             print(_error)
@@ -1312,13 +1315,13 @@ def shutdown_logger(_log_list: list):
 def setup_logger(name: str, log_file: str, _log_list: list, level=logging.INFO):
     try:
         local_logger = logging.getLogger(name)
-        handler = logging.FileHandler(f"{directories['logs']}{log_file}", mode="w", encoding="utf-8")
+        handler = logging.FileHandler(directories['logs'] / log_file, mode="w", encoding="utf-8")
         if name == "logger":
             console_handler = logging.StreamHandler()
             local_logger.addHandler(console_handler)
         local_logger.setLevel(level)
         local_logger.addHandler(handler)
-        _log_list.append(f"{log_file}")
+        _log_list.append(log_file)
         return local_logger
     except Exception as _error:
         print(f"{fortime()}: ERROR in setup_logger - {name}/{log_file}/{level} -- {_error}")
@@ -1353,8 +1356,8 @@ async def special_command(key_stroke: str):
             msg_send = await bot.fish_auto_cast()
             if type(msg_send) == list:
                 msg_send, _status, reason, error = split_list(msg_send)
-        elif key_stroke == bot.special_commands['fish_beet']:
-            msg_send = "!fish beet rod"
+        elif key_stroke == bot.special_commands['fish_beat']:
+            msg_send = "!fish beat rod"
         elif key_stroke == bot.special_commands['fish_stroke']:
             msg_send = "!fish stroke rod"
         elif key_stroke == bot.special_commands['free_pack']:
@@ -3634,17 +3637,20 @@ async def display_stats_fish():
         user_stats = await refresh_user_stats()
         print(await top_bar("Fish Orchard Stats"))
         for name, status in user_stats['orchard']['current'].items():
-            print(f"{name} -> {'🟢' if status else '🔴'} (Total: {numberize(user_stats['orchard']['total_caught'][f'a {name}'])})")
+            print(f"{name} -> {'🟢' if status else '🔴'} (Total: {numberize(user_stats['orchard']['total_caught'][name])})")
         input(f"{bot.long_dashes()}\nHit Enter To Go Back")
 
     async def puzzle_stats():
         cls()
         user_stats = await refresh_user_stats()
-        length = get_length(list(name for name in user_stats['puzzle']['fish'].keys()))
+        length = get_length(list(name for name in user_stats['puzzle']['fish']['current'].keys()))
         print(await top_bar("Fish Puzzle Stats"))
-        for key, value in user_stats['puzzle']['fish'].items():
+        for key, value in user_stats['puzzle']['fish']['current'].items():
             print(f"{max_length(key.replace('_', ' ').title(), length)}: {value}")
-        input(f"{bot.long_dashes()}\nHit Enter To Go Back")
+        # user_input = input(f"{bot.long_dashes()}\n"
+        input(f"{bot.long_dashes()}\n"
+              f"Enter 1 To View History(Not Operational)\n"
+              f"Enter 0 To Go Back\n")
 
     async def refresh_user_stats() -> dict:
         try:
@@ -4391,7 +4397,8 @@ async def display_stats_pp():
         for key, value in dict_print.items():
             key_form = key.replace('_', ' ').title()
             print(f"{max_length(f'{key_form}', length)}: {value}")
-        user_input = input(f"Enter 1 To View History\n"
+        user_input = input(f"{bot.long_dashes()}\n"
+                           f"Enter 1 To View History\n"
                            f"Enter 0 To Go Back\n")
         if user_input.isdigit():
             user_input = int(user_input)
@@ -4462,7 +4469,7 @@ async def on_ready(event: EventData):
         await bot.msg_error("on_ready", f"Failed to connect to {bot.channel_details['target_name']} channel", _error)
 
 
-# ----------- Main Functions -----------
+# ----------- Main -----------
 async def run():
     async def shutdown():
         cls()
@@ -4562,8 +4569,9 @@ if __name__ == "__main__":
                             user = asyncio.run(get_auth_user_id())
                             if user is not None:
                                 bot.set_vars()
-                                keyboard_thread = threading.Thread(target=hotkey_listen, daemon=True)
-                                keyboard_thread.start()
+                                if os.name == "nt":  # ToDo; Find workaround for linux (assuming Mac too maybe?), this library needs to be ran with root...
+                                    keyboard_thread = threading.Thread(target=hotkey_listen, daemon=True)
+                                    keyboard_thread.start()
                                 asyncio.run(run())
                             break
                         else:
