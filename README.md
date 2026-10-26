@@ -1,7 +1,7 @@
  # ChodelingApp
 
 ______________________________________________________________
-Twitch Dev App Setup; (Needed either way)
+Twitch Dev App Setup;
 ______________________________________________________________
 
 Go To; [Twitch Dev Console](https://dev.twitch.tv/console/apps)
