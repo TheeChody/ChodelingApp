@@ -27,6 +27,6 @@ Download latest release
 
 See discord channel 'chodeling-app' pinned comment for auth file needed to launch app
 
-Unzip where you want, then copy over either 'chodeling_string.txt' or 'new_auth_string.txt' to your C:/Users/YOURNAME/Documents/TheeChodelingApp/auth (if you haven't run the app before, you'll either have to create those folders after 'Documents' or run the app once, it'll get upset about chodeling_string.txt not existing, and then close but will create the folders first).
+Unzip where you want, then copy over either 'chodeling_string.txt' or 'new_auth_string.txt' to your C:/Users/YOURNAME/Documents/Thee ChodelingApp/auth (if you haven't run the app before, you'll either have to create those folders after 'Documents' or run the app once, it'll get upset about chodeling_string.txt not existing, and then close but will create the folders first).
 
 Run Thee ChodelingApp.exe and enter in the client_id and client_secret when prompted and you good to go
