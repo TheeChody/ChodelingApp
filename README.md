@@ -29,4 +29,8 @@ See discord channel 'chodeling-app' pinned comment for auth file needed to launc
 
 Unzip where you want, then copy over either 'chodeling_string.txt' or 'new_auth_string.txt' to your C:/Users/YOURNAME/Documents/Thee ChodelingApp/auth (if you haven't run the app before, you'll either have to create those folders after 'Documents' or run the app once, it'll get upset about chodeling_string.txt not existing, and then close but will create the folders first).
 
-Run Thee ChodelingApp.exe and enter in the client_id and client_secret when prompted and you good to go
+Run Thee ChodelingApp.exe and enter in the client_id and client_secret when prompted and your good to go
+
+This setup only has to be done once, then after you'll just run TheeChodelingApp.exe whenever you want to start up the bot. 
+
+Note: Make sure to not close the app with the 'X' button on the titlebar, instead shut down the bot using the numbered menu options (keep entering 0 as an option until you get to the main menu, at the main menu entering 0 will exit, it just keeps the logs nice and tidy in case there are issues later on and you need to send them to me for diagnosing, also closes all the connections nice. i haven't implemented a check for quitting function that would do similar things when shutting down the program by other means)
