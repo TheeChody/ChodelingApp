@@ -27,8 +27,8 @@ jobs:
     - name: Build exe-onedir
       run: pyinstaller --noconfirm --onedir --console --icon "icon.ico" --name "ChodelingApp" --clean --log-level "WARN" chodeling.py
     
-    - name: Build exe-onefile
-      run: pyinstaller --noconfirm --onefile --console --icon "icon.ico" --name "ChodelingApp" --clean --log-level "WARN" chodeling.py
+    #- name: Build exe-onefile
+    #  run: pyinstaller --noconfirm --onefile --console --icon "icon.ico" --name "ChodelingApp" --clean --log-level "WARN" chodeling.py
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
