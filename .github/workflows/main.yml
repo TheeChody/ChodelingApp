@@ -25,11 +25,9 @@ jobs:
         pip install -r requirements.txt
     
     - name: Build exe-onedir
-      # run: pyinstaller --noconfirm --onedir --console --name "QuackAttack" --clean --log-level "WARN" main.py
       run: pyinstaller --noconfirm --onedir --console --icon "icon.ico" --name "ChodelingApp" --clean --log-level "WARN" chodeling.py
     
     - name: Build exe-onefile
-      # run: pyinstaller --noconfirm --onefile --console --name "QuackAttack" --clean --log-level "WARN" main.py
       run: pyinstaller --noconfirm --onefile --console --icon "icon.ico" --name "ChodelingApp" --clean --log-level "WARN" chodeling.py
     
     - name: Upload artifact
